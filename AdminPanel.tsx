@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { GoogleGenAI } from "@google/genai";
 import { AdminSettings, ProductDetails, EmailResult } from './types';
 
 interface AdminPanelProps {
@@ -16,6 +16,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
     const [testEmailStatus, setTestEmailStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
     
+    // States for AI generator
+    const [adminTemplatePrompt, setAdminTemplatePrompt] = useState('Um e-mail simples para notificar o admin sobre um novo pedido, contendo todos os detalhes do cliente e do pedido.');
+    const [userTemplatePrompt, setUserTemplatePrompt] = useState('Um e-mail amigável de confirmação para o cliente, agradecendo pela compra. Inclua um resumo do pedido e as instruções de pagamento PIX.');
+    const [generatedAdminTemplate, setGeneratedAdminTemplate] = useState('');
+    const [generatedUserTemplate, setGeneratedUserTemplate] = useState('');
+    const [isGenerating, setIsGenerating] = useState<'admin' | 'user' | null>(null);
+    const [generationError, setGenerationError] = useState('');
+    const [copied, setCopied] = useState<'admin' | 'user' | ''>('');
+
+
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setAdminSettings(prev => ({ ...prev, [name]: value as any }));
@@ -43,6 +53,80 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         } else {
             setTestEmailStatus({ message: `Falha ao enviar. Detalhe: ${result.error}`, type: 'error' });
         }
+    };
+    
+    const getVariablesGuide = (type: 'admin' | 'user'): string => {
+        const commonVars = `
+            - \`{{nome}}\`: Nome completo do cliente.
+            - \`{{whatsapp}}\`: WhatsApp do cliente.
+            - \`{{email}}\`: E-mail do cliente.
+            - \`{{full_address}}\`: Endereço completo formatado para entrega.
+            - \`{{product_name}}\`: Nome do produto.
+            - \`{{quantity_text}}\`: Quantidade formatada (ex: "500 unidades (5 pacotes)").
+            - \`{{sabores_list}}\`: Lista dos sabores de cada pacote.
+            - \`{{subtotal}}\`: Subtotal dos produtos (ex: "126.05").
+            - \`{{shipping_cost}}\`: Custo do frete (ex: "25.00").
+            - \`{{grand_total}}\`: Valor total do pedido (ex: "151.05").
+        `;
+        const userOnlyVars = `
+            - \`{{user_recipient_email}}\`: E-mail do cliente (use este para o campo "To" no template do cliente).
+            - \`{{orientation_video_url}}\`: URL do vídeo de orientação.
+            - \`{{admin_whatsapp_contact}}\`: Número de WhatsApp do administrador para contato.
+            - \`{{admin_reply_to_email}}\`: E-mail do administrador para resposta.
+            - \`{{company_cnpj}}\`: CNPJ da empresa.
+            - \`{{pix_key_info}}\`: Chave PIX para pagamento.
+        `;
+        if (type === 'user') {
+            return `Aqui está a lista de variáveis que você pode usar:\n${commonVars}\n${userOnlyVars}`;
+        }
+        return `Aqui está a lista de variáveis que você pode usar:\n${commonVars}\n- \`{{reply_to}}\`: E-mail do cliente (Use este campo para a configuração 'Reply-To' no seu template de e-mail no EmailJS para que a resposta vá direto para o cliente).`;
+    };
+
+    const handleGenerateTemplate = async (type: 'admin' | 'user') => {
+        if (!process.env.API_KEY) {
+            setGenerationError("A chave da API do Gemini não foi configurada no ambiente.");
+            return;
+        }
+        setIsGenerating(type);
+        setGenerationError('');
+        if (type === 'admin') setGeneratedAdminTemplate('');
+        if (type === 'user') setGeneratedUserTemplate('');
+
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const userPrompt = type === 'admin' ? adminTemplatePrompt : userTemplatePrompt;
+            const variablesGuide = getVariablesGuide(type);
+
+            const systemInstruction = `Você é um especialista em criar templates de e-mail em HTML para a plataforma EmailJS. Sua tarefa é gerar um código HTML completo e estilizado para um e-mail, baseado na solicitação do usuário. O template DEVE usar as variáveis no formato {{nome_da_variavel}} para inserir dados dinâmicos. O HTML deve ser bem formatado, responsivo e visualmente agradável, usando CSS inline para máxima compatibilidade. Não invente variáveis; use apenas as que são fornecidas na lista. Para variáveis que podem estar vazias (como CNPJ ou vídeo), use a sintaxe de bloco condicional do Handlebars (usada pelo EmailJS): {{#if variavel}}...{{/if}}. Responda APENAS com o código HTML. Não inclua \`\`\`html, explicações ou qualquer outro texto fora do código.\n\n${variablesGuide}`;
+            
+            const response = await ai.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: userPrompt,
+                config: {
+                    systemInstruction: systemInstruction,
+                }
+            });
+
+            const template = response.text;
+            if (type === 'admin') {
+                setGeneratedAdminTemplate(template);
+            } else {
+                setGeneratedUserTemplate(template);
+            }
+        } catch (error) {
+            console.error("Erro ao gerar template com Gemini:", error);
+            const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+            setGenerationError(`Ocorreu um erro ao gerar o template: ${errorMessage}. Verifique o console para mais detalhes.`);
+        } finally {
+            setIsGenerating(null);
+        }
+    };
+
+    const handleCopy = (text: string, type: 'admin' | 'user') => {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        setCopied(type);
+        setTimeout(() => setCopied(''), 2500);
     };
 
     return (
@@ -146,6 +230,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </code>
                                     </pre>
                                 </div>
+                                </div>
+                            </details>
+                        </div>
+
+                         <div className="mt-8 pt-6 border-t border-blue-300">
+                            <details>
+                                <summary className="font-semibold text-fuchsia-800 cursor-pointer hover:text-fuchsia-600 list-none flex items-center gap-2 select-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                    <span className="text-lg">Gerador de Template de E-mail com IA</span>
+                                </summary>
+                                <div className="mt-4 p-4 bg-fuchsia-50 border border-fuchsia-200 rounded-lg space-y-8">
+                                    <p className="text-sm text-fuchsia-700">Com dificuldades para criar os templates no EmailJS? Descreva o que você precisa em cada campo abaixo e deixe a IA gerar o código HTML para você. Depois, é só copiar e colar no seu painel do EmailJS.</p>
+                                    {generationError && <div className="p-3 my-2 text-sm text-red-800 rounded-lg bg-red-100 border border-red-300" role="alert">{generationError}</div>}
+                                    
+                                    <div className="space-y-3">
+                                        <h5 className="font-semibold text-gray-800">1. Template de Notificação para o Administrador</h5>
+                                        <textarea rows={2} placeholder="Ex: Um email formal notificando sobre um novo pedido..." className="block w-full p-2 border rounded-md shadow-sm focus:ring-fuchsia-500 focus:border-fuchsia-500" value={adminTemplatePrompt} onChange={(e) => setAdminTemplatePrompt(e.target.value)} />
+                                        <button onClick={() => handleGenerateTemplate('admin')} disabled={isGenerating === 'admin'} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-all disabled:bg-gray-400 disabled:cursor-wait">
+                                            {isGenerating === 'admin' ? 'Gerando...' : 'Gerar Template do Admin'}
+                                        </button>
+                                        {generatedAdminTemplate && (
+                                            <div className="mt-3 relative">
+                                                <textarea readOnly rows={10} value={generatedAdminTemplate} className="w-full p-3 font-mono text-sm bg-gray-100 border rounded-md resize-y" />
+                                                <button onClick={() => handleCopy(generatedAdminTemplate, 'admin')} className="absolute top-2 right-2 bg-gray-600 hover:bg-gray-700 text-white text-xs font-bold py-1 px-2 rounded transition-colors">
+                                                    {copied === 'admin' ? 'Copiado!' : 'Copiar'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        <h5 className="font-semibold text-gray-800">2. Template de Confirmação para o Cliente</h5>
+                                        <textarea rows={2} placeholder="Ex: Um email amigável de confirmação para o cliente..." className="block w-full p-2 border rounded-md shadow-sm focus:ring-fuchsia-500 focus:border-fuchsia-500" value={userTemplatePrompt} onChange={(e) => setUserTemplatePrompt(e.target.value)} />
+                                        <button onClick={() => handleGenerateTemplate('user')} disabled={isGenerating === 'user'} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-all disabled:bg-gray-400 disabled:cursor-wait">
+                                            {isGenerating === 'user' ? 'Gerando...' : 'Gerar Template do Cliente'}
+                                        </button>
+                                        {generatedUserTemplate && (
+                                            <div className="mt-3 relative">
+                                                <textarea readOnly rows={10} value={generatedUserTemplate} className="w-full p-3 font-mono text-sm bg-gray-100 border rounded-md resize-y" />
+                                                <button onClick={() => handleCopy(generatedUserTemplate, 'user')} className="absolute top-2 right-2 bg-gray-600 hover:bg-gray-700 text-white text-xs font-bold py-1 px-2 rounded transition-colors">
+                                                    {copied === 'user' ? 'Copiado!' : 'Copiar'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </details>
                         </div>
