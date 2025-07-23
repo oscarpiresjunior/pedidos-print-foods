@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 
 interface FormData {
   nome: string;
@@ -121,6 +122,29 @@ const App: React.FC = () => {
     emailJsPublicKey: '',
     pixKey: 'SEU CNPJ (CONFIGURAR NO PAINEL ADMIN)',
   });
+
+  // Load settings from localStorage on initial render
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('adminSettings');
+    if (savedSettings) {
+      try {
+        const parsedSettings = JSON.parse(savedSettings);
+        // Merge with defaults to ensure all keys are present
+        setAdminSettings(prev => ({ ...prev, ...parsedSettings }));
+      } catch (error) {
+        console.error("Failed to parse admin settings from localStorage", error);
+      }
+    }
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Save settings to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
+    } catch (error) {
+      console.error("Failed to save admin settings to localStorage", error);
+    }
+  }, [adminSettings]); // This runs whenever adminSettings changes
 
   const subtotal = useMemo(() => {
     const numPackages = formData.quantity / UNITS_PER_PACKAGE;
