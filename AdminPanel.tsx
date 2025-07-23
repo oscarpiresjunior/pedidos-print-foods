@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { AdminSettings, ProductDetails, EmailResult } from './types';
+import { GEMINI_API_KEY } from './config';
 
 interface AdminPanelProps {
     adminSettings: AdminSettings;
@@ -83,9 +84,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     };
 
     const handleGenerateTemplate = async (type: 'admin' | 'user') => {
-        const apiKeyErrorMessage = "A funcionalidade de IA não pôde ser acessada. A chave da API do Google Gemini parece estar ausente ou inválida na configuração do ambiente. O administrador do sistema precisa verificar esta configuração.";
+        const apiKeyErrorMessage = "A funcionalidade de IA não pôde ser acessada. A chave da API do Google Gemini parece estar ausente ou inválida no arquivo config.ts. Peça ao administrador para verificar esta configuração.";
 
-        if (!process.env.API_KEY) {
+        if (!GEMINI_API_KEY || GEMINI_API_KEY === "COLOQUE_SUA_API_KEY_AQUI") {
             setGenerationError(apiKeyErrorMessage);
             return;
         }
@@ -95,7 +96,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         if (type === 'user') setGeneratedUserTemplate('');
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const userPrompt = type === 'admin' ? adminTemplatePrompt : userTemplatePrompt;
             const variablesGuide = getVariablesGuide(type);
 
@@ -249,11 +250,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </summary>
                                 <div className="mt-4 p-4 bg-fuchsia-50 border border-fuchsia-200 rounded-lg space-y-8">
                                     <p className="text-sm text-fuchsia-700">Com dificuldades para criar os templates no EmailJS? Descreva o que você precisa em cada campo abaixo e deixe a IA gerar o código HTML para você. Depois, é só copiar e colar no seu painel do EmailJS.</p>
-                                    
-                                    <div className="p-3 my-2 text-sm text-amber-800 rounded-lg bg-amber-100 border border-amber-300" role="alert">
-                                        <p><strong className="font-bold">Nota de Configuração:</strong> Para que o gerador de IA funcione, a chave da API do Google Gemini deve ser configurada pelo administrador do sistema no ambiente da aplicação. Por segurança, a chave não é inserida ou salva nesta tela.</p>
-                                    </div>
-                                    
+                                                                        
                                     {generationError && <div className="p-3 my-2 text-sm text-red-800 rounded-lg bg-red-100 border border-red-300" role="alert">{generationError}</div>}
                                     
                                     <div className="space-y-3">

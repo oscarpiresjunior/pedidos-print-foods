@@ -4,6 +4,7 @@ import { AdminSettings, FormData, ProductDetails, EmailResult } from './types';
 import OrderForm from './OrderForm';
 import SuccessPage from './SuccessPage';
 import AdminPanel from './AdminPanel';
+import { ADMIN_USERNAME, ADMIN_PASSWORD } from './config';
 
 // Funções utilitárias movidas para fora do componente para clareza
 const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: string, apiKey: string): Promise<void> => {
@@ -181,9 +182,7 @@ const App: React.FC = () => {
   
   const handleAdminLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const adminUser = process.env.ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'admin';
-    if (adminCredentials.username === adminUser && adminCredentials.password === adminPass) {
+    if (adminCredentials.username === ADMIN_USERNAME && adminCredentials.password === ADMIN_PASSWORD) {
       setIsAdminView(true);
       setShowAdminLoginModal(false);
       setAdminLoginError(null);
