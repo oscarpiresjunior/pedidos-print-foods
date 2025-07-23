@@ -242,6 +242,7 @@ const App: React.FC = () => {
         submissionError={submissionError}
         setSubmissionStatus={setSubmissionStatus}
         setSubmissionError={setSubmissionError}
+        logoBase64={adminSettings.logoBase64}
       />
       <footer className="text-center mt-8">
         <button onClick={() => setShowAdminLoginModal(true)} className="text-sm text-gray-400 hover:text-blue-600 transition-colors">

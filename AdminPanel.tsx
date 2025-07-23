@@ -101,6 +101,55 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <input type="text" name="emailJsTemplateIdAdmin" placeholder="Template ID (Admin)" value={adminSettings.emailJsTemplateIdAdmin} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             <input type="text" name="emailJsTemplateIdUser" placeholder="Template ID (Cliente)" value={adminSettings.emailJsTemplateIdUser} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                         </div>
+                        
+                        <div className="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                            <details>
+                                <summary className="font-semibold text-indigo-800 cursor-pointer hover:text-indigo-600 list-none">
+                                    <span className="select-none">Guia de Variáveis para Template (Clique para expandir)</span>
+                                </summary>
+                                <div className="mt-4 pt-4 border-t border-indigo-200 space-y-4 text-gray-700">
+                                <p className="text-sm">Use estas variáveis nos seus templates no site do EmailJS para exibir os dados do pedido. Basta copiar e colar <code>{"{{nome_da_variavel}}"}</code>.</p>
+                                <div>
+                                    <h5 className="font-semibold text-gray-800">Variáveis Comuns (Admin e Cliente)</h5>
+                                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                                    <li><code>{"{{nome}}"}</code>: Nome completo do cliente.</li>
+                                    <li><code>{"{{whatsapp}}"}</code>: WhatsApp do cliente.</li>
+                                    <li><code>{"{{email}}"}</code>: E-mail do cliente (usado como 'reply_to' no e-mail do admin).</li>
+                                    <li><code>{"{{full_address}}"}</code>: Endereço completo formatado para entrega.</li>
+                                    <li><code>{"{{product_name}}"}</code>: Nome do produto.</li>
+                                    <li><code>{"{{quantity_text}}"}</code>: Quantidade formatada (ex: "500 unidades (5 pacotes)").</li>
+                                    <li><code>{"{{sabores_list}}"}</code>: Lista dos sabores de cada pacote.</li>
+                                    <li><code>{"{{subtotal}}"}</code>: Subtotal dos produtos (ex: "126.05").</li>
+                                    <li><code>{"{{shipping_cost}}"}</code>: Custo do frete (ex: "25.00").</li>
+                                    <li><code>{"{{grand_total}}"}</code>: Valor total do pedido (ex: "151.05").</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 className="font-semibold text-gray-800">Variáveis Adicionais (Apenas para Template do Cliente)</h5>
+                                    <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                                    <li><code>{"{{user_recipient_email}}"}</code>: E-mail do cliente (use este para o campo "To" no template do cliente).</li>
+                                    <li><code>{"{{orientation_video_url}}"}</code>: URL do vídeo de orientação.</li>
+                                    <li><code>{"{{admin_whatsapp_contact}}"}</code>: Número de WhatsApp do administrador para contato.</li>
+                                    <li><code>{"{{admin_reply_to_email}}"}</code>: E-mail do administrador para resposta.</li>
+                                    <li><code>{"{{company_cnpj}}"}</code>: CNPJ da empresa.</li>
+                                    <li><code>{"{{pix_key_info}}"}</code>: Chave PIX para pagamento.</li>
+                                    </ul>
+                                </div>
+                                <div className="p-3 bg-yellow-100 border border-yellow-300 rounded-md">
+                                    <h5 className="font-bold text-yellow-800">Importante: Campos Opcionais</h5>
+                                    <p className="text-sm text-yellow-700 mt-1">Para campos que podem não ser preenchidos (como CNPJ ou Vídeo), use blocos condicionais para evitar erros de "variáveis corrompidas". Exemplo:</p>
+                                    <pre className="mt-2 p-2 bg-gray-800 text-white rounded-md text-xs overflow-x-auto">
+                                    <code>
+                                        {'{{#if company_cnpj}}\n'}
+                                        {'  <p>Nosso CNPJ: {{company_cnpj}}</p>\n'}
+                                        {'{{/if}}'}
+                                    </code>
+                                    </pre>
+                                </div>
+                                </div>
+                            </details>
+                        </div>
+                        
                          <div className="mt-6">
                             <button type="button" onClick={handleTestEmailClick} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md">Testar E-mail Admin</button>
                             {testEmailStatus.message && <p className={`mt-2 text-sm ${testEmailStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{testEmailStatus.message}</p>}

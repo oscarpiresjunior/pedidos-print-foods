@@ -31,6 +31,7 @@ const SuccessPage: React.FC<SuccessPageProps> = ({
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-2xl">
+         {adminSettings.logoBase64 && <img src={adminSettings.logoBase64} alt="Logo da Empresa" className="mx-auto h-20 w-auto mb-6"/>}
          <div className="text-center p-4 sm:p-8 bg-green-50 rounded-lg shadow-lg border-2 border-green-200">
               <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-4">Pedido Enviado com Sucesso!</h2>
               <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e um e-mail com os detalhes foi enviado para {formData.email}.</p>

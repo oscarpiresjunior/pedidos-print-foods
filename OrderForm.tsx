@@ -12,6 +12,7 @@ interface OrderFormProps {
   submissionError: string | null;
   setSubmissionStatus: React.Dispatch<React.SetStateAction<'idle' | 'submitting' | 'error'>>;
   setSubmissionError: React.Dispatch<React.SetStateAction<string | null>>;
+  logoBase64?: string;
 }
 
 const MINIMUM_UNITS = 500;
@@ -25,7 +26,7 @@ const brazilianStates = [
 const OrderForm: React.FC<OrderFormProps> = ({
   formData, setFormData, editableProduct, orderTotals,
   handleSubmit, submissionStatus, submissionError,
-  setSubmissionStatus, setSubmissionError
+  setSubmissionStatus, setSubmissionError, logoBase64
 }) => {
   const [cepError, setCepError] = useState<string | null>(null);
 
@@ -97,6 +98,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   return (
     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-2xl">
         <header className="text-center mb-8">
+            {logoBase64 && <img src={logoBase64} alt="Logo da Empresa" className="mx-auto h-20 w-auto mb-6"/>}
             <h1 className="text-4xl sm:text-5xl font-bold text-blue-800">Print Foods®</h1>
             <p className="text-gray-600 mt-2">Olá, aluna do curso Minha Fábrica de Crepes! Faça seu pedido aqui.</p>
         </header>
