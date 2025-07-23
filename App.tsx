@@ -25,6 +25,7 @@ interface AdminSettings {
   emailJsTemplateIdAdmin: string;
   emailJsTemplateIdUser: string;
   emailJsPublicKey: string;
+  pixKey: string;
 }
 
 const MINIMUM_UNITS = 500;
@@ -45,6 +46,10 @@ const brazilianStates = [
 ];
 
 const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: string, apiKey: string): Promise<void> => {
+  if (!apiKey || !adminPhoneNumber) {
+    console.warn("CallMeBot API Key ou número do admin não configurado. WhatsApp não enviado.");
+    return;
+  }
   const phoneNumberOnlyDigits = adminPhoneNumber.replace(/\D/g, '');
   const encodedMessage = encodeURIComponent(message);
   const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumberOnlyDigits}&text=${encodedMessage}&apikey=${apiKey}`;
@@ -107,13 +112,14 @@ const App: React.FC = () => {
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     adminEmail: 'atendimento@printfoods.com.br',
-    adminWhatsapp: '5511999998888',
-    orientationVideoUrl: '', // Can be a link to ordering instructions
+    adminWhatsapp: '5522997146538',
+    orientationVideoUrl: '',
     callMeBotApiKey: '',
     emailJsServiceId: '',
     emailJsTemplateIdAdmin: '',
     emailJsTemplateIdUser: '',
     emailJsPublicKey: '',
+    pixKey: 'SEU CNPJ (CONFIGURAR NO PAINEL ADMIN)',
   });
 
   const subtotal = useMemo(() => {
@@ -297,13 +303,15 @@ const App: React.FC = () => {
           </header>
 
           <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200 mb-8">
-            <h2 className="text-xl font-semibold text-blue-700 mb-4">Configurações Gerais de Notificação</h2>
+            <h2 className="text-xl font-semibold text-blue-700 mb-4">Configurações Gerais</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
               <input type="email" id="adminEmail" name="adminEmail" value={adminSettings.adminEmail} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="E-mail do Admin"/>
               <input type="tel" id="adminWhatsapp" name="adminWhatsapp" value={adminSettings.adminWhatsapp} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="WhatsApp do Admin (ex: 55119...)" />
-              <input type="text" id="callMeBotApiKey" name="callMeBotApiKey" value={adminSettings.callMeBotApiKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="CallMeBot API Key"/>
+              <input type="text" id="pixKey" name="pixKey" value={adminSettings.pixKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Chave PIX (CNPJ, e-mail, etc.)" />
               <input type="url" id="orientationVideoUrl" name="orientationVideoUrl" value={adminSettings.orientationVideoUrl} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="URL do Vídeo de Orientação"/>
             </div>
+             <h3 className="text-lg font-semibold text-blue-600 mt-6 mb-3">Configurações do CallMeBot (WhatsApp)</h3>
+              <input type="text" id="callMeBotApiKey" name="callMeBotApiKey" value={adminSettings.callMeBotApiKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="CallMeBot API Key"/>
              <h3 className="text-lg font-semibold text-blue-600 mt-6 mb-3">Configurações do EmailJS</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                  <input type="text" id="emailJsServiceId" name="emailJsServiceId" value={adminSettings.emailJsServiceId} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="EmailJS Service ID"/>
@@ -434,19 +442,31 @@ const App: React.FC = () => {
         ) : (
           <div className="space-y-6 text-center">
             <div id="confirmacao" className="p-4 sm:p-6 bg-green-50 border-l-4 border-green-500 rounded-md shadow-md text-left">
-              <div className="flex">
-                <div className="flex-shrink-0"><svg className="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg></div>
-                <div className="ml-3">
-                  <p className="text-md font-semibold text-green-800">Seu pedido foi enviado com sucesso!</p>
-                  <div className="mt-2 text-sm text-green-700 space-y-1">
-                    <p><strong>Produto:</strong> {editableProduct.name} ({formData.quantity} unidades)</p>
-                    <p><strong>Subtotal:</strong> R$ {subtotal.toFixed(2)}</p>
-                    <p><strong>Frete ({formData.estado}):</strong> R$ {shippingCost.toFixed(2)}</p>
-                    <p><strong>Total:</strong> R$ {grandTotal.toFixed(2)}</p>
-                    <p className="mt-3 font-medium">Um e-mail de confirmação foi enviado para {formData.email}. Verifique sua caixa de entrada e spam.</p>
-                    <p className="mt-1 font-medium">Nossa equipe entrará em contato pelo WhatsApp para confirmar o pedido e enviar as instruções de pagamento.</p>
+              <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                      <svg className="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
                   </div>
-                </div>
+                  <div className="ml-3">
+                      <h3 className="text-lg font-bold text-green-800">Pedido enviado! Próximo passo: Pagamento</h3>
+                      <p className="mt-2 text-md text-green-700">Para finalizar, realize o pagamento do valor total e envie o comprovante.</p>
+
+                      <div className="mt-4 p-4 bg-gray-100 rounded-lg text-gray-800">
+                          <p className="font-semibold">Pague com PIX:</p>
+                          <p className="mt-1"><strong>Chave PIX (CNPJ):</strong> <span className="font-mono bg-gray-200 px-2 py-1 rounded">{adminSettings.pixKey || 'Não configurada'}</span></p>
+                          <p className="mt-1"><strong>Valor Total:</strong> <span className="font-bold">R$ {grandTotal.toFixed(2)}</span></p>
+                      </div>
+
+                      <a href={`https://wa.me/${adminSettings.adminWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Segue o comprovante do pedido em nome de ${formData.nome}, no valor de R$ ${grandTotal.toFixed(2)}.`)}`}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="mt-4 inline-block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md shadow-lg transition-transform transform hover:scale-105">
+                         Enviar Comprovante por WhatsApp
+                      </a>
+                      
+                      <p className="mt-4 text-sm text-gray-600">Um e-mail de confirmação com os detalhes do pedido foi enviado para <strong>{formData.email}</strong>. Verifique sua caixa de entrada e spam.</p>
+                  </div>
               </div>
             </div>
 
