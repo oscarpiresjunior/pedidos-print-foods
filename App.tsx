@@ -27,6 +27,7 @@ interface AdminSettings {
   emailJsTemplateIdUser: string;
   emailJsPublicKey: string;
   pixKey: string;
+  cnpj: string;
 }
 
 const MINIMUM_UNITS = 500;
@@ -120,7 +121,8 @@ const App: React.FC = () => {
     emailJsTemplateIdAdmin: '',
     emailJsTemplateIdUser: '',
     emailJsPublicKey: '',
-    pixKey: 'SEU CNPJ (CONFIGURAR NO PAINEL ADMIN)',
+    pixKey: '',
+    cnpj: '',
   });
 
   // Load settings from localStorage on initial render
@@ -239,6 +241,7 @@ const App: React.FC = () => {
     }
 
     // 3. Send Confirmation Email to User via EmailJS
+    const pixToDisplay = adminSettings.pixKey || adminSettings.cnpj;
     if (adminSettings.emailJsServiceId && adminSettings.emailJsTemplateIdUser && adminSettings.emailJsPublicKey) {
       const userEmailParams = {
         user_name: userName,
@@ -253,6 +256,8 @@ const App: React.FC = () => {
         orientation_video_url: adminSettings.orientationVideoUrl,
         admin_whatsapp_contact: adminSettings.adminWhatsapp,
         admin_reply_to_email: adminSettings.adminEmail,
+        company_cnpj: adminSettings.cnpj,
+        pix_key_info: pixToDisplay,
       };
       await sendEmailViaEmailJS(
         adminSettings.emailJsServiceId,
@@ -313,7 +318,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
         <div className="bg-white p-6 sm:p-10 rounded-xl shadow-lg w-full max-w-4xl mx-auto">
-          <header className="flex justify-between items-center mb-8">
+          <header className="flex justify-between items-center mb-10">
             <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-bold text-blue-800">Print Foods®</h1>
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">Painel Administrativo</h2>
@@ -326,23 +331,80 @@ const App: React.FC = () => {
             </button>
           </header>
 
-          <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200 mb-8">
-            <h2 className="text-xl font-semibold text-blue-700 mb-4">Configurações Gerais</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-              <input type="email" id="adminEmail" name="adminEmail" value={adminSettings.adminEmail} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="E-mail do Admin"/>
-              <input type="tel" id="adminWhatsapp" name="adminWhatsapp" value={adminSettings.adminWhatsapp} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="WhatsApp do Admin (ex: 55119...)" />
-              <input type="text" id="pixKey" name="pixKey" value={adminSettings.pixKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Chave PIX (CNPJ, e-mail, etc.)" />
-              <input type="url" id="orientationVideoUrl" name="orientationVideoUrl" value={adminSettings.orientationVideoUrl} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="URL do Vídeo de Orientação"/>
+          <div className="space-y-8 mb-8">
+            <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
+                <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b border-blue-200 pb-3">Informações da Loja e Pagamento</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                    <div>
+                        <label htmlFor="cnpj" className="block text-sm font-medium text-gray-700">CNPJ da Empresa</label>
+                        <input type="text" id="cnpj" name="cnpj" value={adminSettings.cnpj} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="00.000.000/0001-00"/>
+                        <p className="mt-1 text-xs text-gray-500">Será exibido na página de pagamento.</p>
+                    </div>
+                    <div>
+                        <label htmlFor="pixKey" className="block text-sm font-medium text-gray-700">Chave PIX para Pagamento</label>
+                        <input type="text" id="pixKey" name="pixKey" value={adminSettings.pixKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="E-mail, telefone, etc."/>
+                        <p className="mt-1 text-xs text-gray-500">Deixe em branco para usar o CNPJ como Chave PIX.</p>
+                    </div>
+                    <div className="md:col-span-2">
+                        <label htmlFor="orientationVideoUrl" className="block text-sm font-medium text-gray-700">URL do Vídeo de Orientação</label>
+                        <input type="url" id="orientationVideoUrl" name="orientationVideoUrl" value={adminSettings.orientationVideoUrl} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="https://youtube.com/seu-video"/>
+                        <p className="mt-1 text-xs text-gray-500">Link enviado no e-mail de confirmação ao cliente.</p>
+                    </div>
+                </div>
             </div>
-             <h3 className="text-lg font-semibold text-blue-600 mt-6 mb-3">Configurações do CallMeBot (WhatsApp)</h3>
-              <input type="text" id="callMeBotApiKey" name="callMeBotApiKey" value={adminSettings.callMeBotApiKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="CallMeBot API Key"/>
-             <h3 className="text-lg font-semibold text-blue-600 mt-6 mb-3">Configurações do EmailJS</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                 <input type="text" id="emailJsServiceId" name="emailJsServiceId" value={adminSettings.emailJsServiceId} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="EmailJS Service ID"/>
-                 <input type="text" id="emailJsPublicKey" name="emailJsPublicKey" value={adminSettings.emailJsPublicKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="EmailJS Public Key"/>
-                 <input type="text" id="emailJsTemplateIdAdmin" name="emailJsTemplateIdAdmin" value={adminSettings.emailJsTemplateIdAdmin} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Template ID (Admin)"/>
-                 <input type="text" id="emailJsTemplateIdUser" name="emailJsTemplateIdUser" value={adminSettings.emailJsTemplateIdUser} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Template ID (User)"/>
-             </div>
+
+            <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
+                <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b border-blue-200 pb-3">Configurações de Notificação</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 mb-8">
+                    <div>
+                        <label htmlFor="adminEmail" className="block text-sm font-medium text-gray-700">E-mail do Administrador</label>
+                        <input type="email" id="adminEmail" name="adminEmail" value={adminSettings.adminEmail} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="seu-email@provedor.com"/>
+                        <p className="mt-1 text-xs text-gray-500">E-mail que receberá os avisos de novos pedidos.</p>
+                    </div>
+                    <div>
+                        <label htmlFor="adminWhatsapp" className="block text-sm font-medium text-gray-700">WhatsApp do Administrador</label>
+                        <input type="tel" id="adminWhatsapp" name="adminWhatsapp" value={adminSettings.adminWhatsapp} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="5511987654321"/>
+                        <p className="mt-1 text-xs text-gray-500">Para notificações e contato do cliente.</p>
+                    </div>
+                </div>
+                
+                <div className="space-y-8">
+                    <div>
+                        <h4 className="text-lg font-semibold text-blue-600 mb-4">Integração com CallMeBot (WhatsApp)</h4>
+                        <div>
+                            <label htmlFor="callMeBotApiKey" className="block text-sm font-medium text-gray-700">API Key do CallMeBot</label>
+                            <input type="text" id="callMeBotApiKey" name="callMeBotApiKey" value={adminSettings.callMeBotApiKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+                            <p className="mt-1 text-xs text-gray-500">Sua chave da API encontrada no site do CallMeBot.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-lg font-semibold text-blue-600 mb-4">Integração com EmailJS</h4>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                            <div>
+                                <label htmlFor="emailJsServiceId" className="block text-sm font-medium text-gray-700">Service ID</label>
+                                <input type="text" id="emailJsServiceId" name="emailJsServiceId" value={adminSettings.emailJsServiceId} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="service_xxxxxxxx"/>
+                                <p className="mt-1 text-xs text-gray-500">Em Email Services &gt; (seu serviço) &gt; copie o Service ID.</p>
+                            </div>
+                             <div>
+                                <label htmlFor="emailJsPublicKey" className="block text-sm font-medium text-gray-700">Public Key</label>
+                                <input type="text" id="emailJsPublicKey" name="emailJsPublicKey" value={adminSettings.emailJsPublicKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Sua_Public_Key"/>
+                                <p className="mt-1 text-xs text-gray-500">Em Account &gt; API Keys &gt; copie a Public Key.</p>
+                            </div>
+                             <div>
+                                <label htmlFor="emailJsTemplateIdAdmin" className="block text-sm font-medium text-gray-700">Template ID (Admin)</label>
+                                <input type="text" id="emailJsTemplateIdAdmin" name="emailJsTemplateIdAdmin" value={adminSettings.emailJsTemplateIdAdmin} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="template_xxxxxxxx"/>
+                                <p className="mt-1 text-xs text-gray-500">ID do template de e-mail para notificar o admin.</p>
+                            </div>
+                             <div>
+                                <label htmlFor="emailJsTemplateIdUser" className="block text-sm font-medium text-gray-700">Template ID (Cliente)</label>
+                                <input type="text" id="emailJsTemplateIdUser" name="emailJsTemplateIdUser" value={adminSettings.emailJsTemplateIdUser} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="template_xxxxxxxx"/>
+                                <p className="mt-1 text-xs text-gray-500">ID do template de e-mail de confirmação para o cliente.</p>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
           </div>
           
           <h2 className="text-xl font-semibold text-blue-800 mb-4">Gerenciamento de Produto</h2>
@@ -367,6 +429,46 @@ const App: React.FC = () => {
       </div>
     );
   }
+
+  if (isSubmitted) {
+    const pixToDisplay = adminSettings.pixKey || adminSettings.cnpj;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-2xl">
+           <div className="text-center p-4 sm:p-8 bg-green-50 rounded-lg shadow-lg border-2 border-green-200">
+                <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-4">Pedido Enviado com Sucesso!</h2>
+                <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e em breve entraremos em contato pelo WhatsApp para confirmar os detalhes do pagamento e da entrega.</p>
+                
+                <div className="bg-white p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3 mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-3">Resumo do Pedido</h3>
+                    <p className="text-gray-700"><strong>Produto:</strong> {editableProduct.name}</p>
+                    <p className="text-gray-700"><strong>Quantidade:</strong> {formData.quantity} unidades</p>
+                    <p className="text-gray-700"><strong>Subtotal:</strong> R$ {subtotal.toFixed(2)}</p>
+                    <p className="text-gray-700"><strong>Frete para {formData.estado}:</strong> R$ {shippingCost.toFixed(2)}</p>
+                    <p className="text-lg font-bold text-gray-800"><strong>Total:</strong> R$ {grandTotal.toFixed(2)}</p>
+                </div>
+
+                <div className="bg-blue-50 p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3">
+                    <h3 className="text-lg font-semibold text-blue-800 border-b pb-2 mb-3">Instruções para Pagamento</h3>
+                    <p className="text-gray-700">Para agilizar, realize o pagamento no valor total de <strong className="font-bold text-blue-900">R$ {grandTotal.toFixed(2)}</strong> via PIX e envie o comprovante para o nosso WhatsApp.</p>
+                    <div className="mt-4 p-4 bg-gray-100 rounded-md space-y-2">
+                        {adminSettings.cnpj && <p className="text-gray-800"><strong className="font-semibold">CNPJ:</strong> {adminSettings.cnpj}</p>}
+                        {pixToDisplay && <p className="text-gray-800"><strong className="font-semibold">Chave PIX:</strong> {pixToDisplay}</p>}
+                    </div>
+                    <p className="text-gray-700 mt-4">Nosso WhatsApp para envio do comprovante e dúvidas é: <strong className="font-semibold">{adminSettings.adminWhatsapp}</strong></p>
+                    {adminSettings.orientationVideoUrl && (
+                        <p className="text-sm text-gray-600 mt-4">Assista nosso <a href={adminSettings.orientationVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">vídeo de orientação</a> sobre como aplicar as etiquetas.</p>
+                    )}
+                </div>
+                <button onClick={handleNewRegistration} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-300">
+                    Fazer Novo Pedido
+                </button>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 font-sans">
@@ -407,121 +509,113 @@ const App: React.FC = () => {
                             {formData.sabores.map((sabor, index) => (
                                 <div key={index}>
                                     <label htmlFor={`sabor-${index}`} className="block text-xs text-gray-600 mb-1">Pacote {index + 1}:</label>
-                                    <input type="text" id={`sabor-${index}`} name={`sabor-${index}`} value={sabor} onChange={(e) => handleFlavorChange(index, e.target.value)} required className="block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Frango com Catupiry"/>
+                                    <input type="text" id={`sabor-${index}`} value={sabor} onChange={(e) => handleFlavorChange(index, e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Chocolate"/>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
-                
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <h3 className="block text-lg font-medium text-gray-800 mb-4">2. Endereço de Entrega:</h3>
-                  <div>
-                    <label htmlFor="estado" className="block text-sm font-medium text-gray-700 mb-1">Estado:</label>
-                    <select id="estado" name="estado" value={formData.estado} onChange={handleChange} required className="mt-1 block w-full max-w-xs px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="" disabled>Selecione seu estado</option>
-                      {brazilianStates.map(state => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
                 <div className="p-4 bg-gray-50 rounded-lg border">
-                    <h3 className="block text-lg font-medium text-gray-800 mb-4">3. Seus Dados para Contato:</h3>
-                    <div>
-                      <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">Nome completo:</label>
-                      <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} required className="mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Seu nome completo"/>
-                    </div>
-                    <div className="mt-4">
-                      <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700 mb-1">WhatsApp (com DDD):</label>
-                      <input type="tel" id="whatsapp" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required className="mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="(XX) XXXXX-XXXX"/>
-                    </div>
-                    <div className="mt-4">
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">E-mail:</label>
-                      <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required className="mt-1 block w-full px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="seuemail@exemplo.com"/>
-                    </div>
-                </div>
-                
-                <div className="mt-6 p-4 bg-blue-100 border-t-4 border-blue-500 rounded-b-lg text-left space-y-2">
-                    <div className="flex justify-between items-center text-lg text-blue-800">
-                      <span>Subtotal dos Produtos:</span>
-                      <span className="font-semibold">R$ {subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-lg text-blue-800">
-                      <span>Frete:</span>
-                      <span className="font-semibold">R$ {shippingCost.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xl font-bold text-blue-900 border-t pt-2 mt-2">
-                      <span>Total do Pedido:</span>
-                      <span>R$ {grandTotal.toFixed(2)}</span>
+                    <h3 className="block text-lg font-medium text-gray-800 mb-4">2. Seus Dados e Entrega:</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome Completo:</label>
+                            <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                        <div>
+                            <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700">WhatsApp (com DDD):</label>
+                            <input type="tel" id="whatsapp" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 11987654321"/>
+                        </div>
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">E-mail:</label>
+                            <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        </div>
+                        <div>
+                            <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado para Entrega:</label>
+                            <select id="estado" name="estado" value={formData.estado} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="" disabled>Selecione um estado</option>
+                                {brazilianStates.map(state => <option key={state} value={state}>{state}</option>)}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150 ease-in-out transform hover:scale-105" disabled={!formData.nome || !formData.whatsapp || !formData.email || !formData.estado}>
-                  Enviar Pedido
+                <div className="p-6 bg-blue-100 rounded-lg shadow-md mt-6">
+                    <h3 className="text-xl font-semibold text-blue-800 mb-4">Resumo do Pedido</h3>
+                    <div className="space-y-2 text-gray-700">
+                        <div className="flex justify-between"><span>Subtotal dos Produtos:</span> <span>R$ {subtotal.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>Frete (para {formData.estado || '...'}):</span> <span>R$ {shippingCost.toFixed(2)}</span></div>
+                        <hr className="my-2 border-blue-200"/>
+                        <div className="flex justify-between text-lg font-bold text-blue-900"><span>Valor Total:</span> <span>R$ {grandTotal.toFixed(2)}</span></div>
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300">
+                    Finalizar Pedido e Ver Dados de Pagamento
                 </button>
             </form>
           </>
-        ) : (
-          <div className="space-y-6 text-center">
-            <div id="confirmacao" className="p-4 sm:p-6 bg-green-50 border-l-4 border-green-500 rounded-md shadow-md text-left">
-              <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                      <svg className="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                  </div>
-                  <div className="ml-3">
-                      <h3 className="text-lg font-bold text-green-800">Pedido enviado! Próximo passo: Pagamento</h3>
-                      <p className="mt-2 text-md text-green-700">Para finalizar, realize o pagamento do valor total e envie o comprovante.</p>
+        ) : null}
 
-                      <div className="mt-4 p-4 bg-gray-100 rounded-lg text-gray-800">
-                          <p className="font-semibold">Pague com PIX:</p>
-                          <p className="mt-1"><strong>Chave PIX (CNPJ):</strong> <span className="font-mono bg-gray-200 px-2 py-1 rounded">{adminSettings.pixKey || 'Não configurada'}</span></p>
-                          <p className="mt-1"><strong>Valor Total:</strong> <span className="font-bold">R$ {grandTotal.toFixed(2)}</span></p>
-                      </div>
-
-                      <a href={`https://wa.me/${adminSettings.adminWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá! Segue o comprovante do pedido em nome de ${formData.nome}, no valor de R$ ${grandTotal.toFixed(2)}.`)}`}
-                         target="_blank"
-                         rel="noopener noreferrer"
-                         className="mt-4 inline-block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md shadow-lg transition-transform transform hover:scale-105">
-                         Enviar Comprovante por WhatsApp
-                      </a>
-                      
-                      <p className="mt-4 text-sm text-gray-600">Um e-mail de confirmação com os detalhes do pedido foi enviado para <strong>{formData.email}</strong>. Verifique sua caixa de entrada e spam.</p>
-                  </div>
-              </div>
-            </div>
-
-            <button onClick={handleNewRegistration} className="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400">
-              Fazer Novo Pedido
-            </button>
-          </div>
+        {!isSubmitted && (
+            <footer className="text-center mt-8">
+              <button
+                onClick={() => setShowAdminLoginModal(true)}
+                className="text-sm text-gray-400 hover:text-blue-600 transition-colors"
+              >
+                Acesso Administrativo
+              </button>
+            </footer>
         )}
-        <footer className="mt-12 text-center text-sm text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Print Foods. Todos os direitos reservados.</p>
-          {!isAdminView && (<button onClick={() => { setAdminLoginError(null); setShowAdminLoginModal(true); }} className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline">Acesso Administrativo</button>)}
-        </footer>
       </div>
 
       {showAdminLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
-            <h2 className="text-2xl font-bold text-blue-800 mb-6 text-center">Login Administrativo</h2>
-            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="admin-username" className="block text-sm font-medium text-gray-700">Usuário:</label>
-                <input type="text" id="admin-username" name="username" value={adminCredentials.username} onChange={handleAdminLoginChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Login Administrativo</h2>
+            <form onSubmit={handleAdminLoginSubmit}>
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
+                  Usuário
+                </label>
+                <input
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  id="username"
+                  type="text"
+                  name="username"
+                  value={adminCredentials.username}
+                  onChange={handleAdminLoginChange}
+                />
               </div>
-              <div>
-                <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700">Senha:</label>
-                <input type="password" id="admin-password" name="password" value={adminCredentials.password} onChange={handleAdminLoginChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
+              <div className="mb-6">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+                  Senha
+                </label>
+                <input
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+                  id="password"
+                  type="password"
+                  name="password"
+                  value={adminCredentials.password}
+                  onChange={handleAdminLoginChange}
+                />
+                {adminLoginError && <p className="text-red-500 text-xs italic">{adminLoginError}</p>}
               </div>
-              {adminLoginError && <p className="text-sm text-red-600">{adminLoginError}</p>}
-              <div className="flex items-center justify-between pt-2">
-                <button type="button" onClick={() => setShowAdminLoginModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md shadow-sm">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Entrar</button>
+              <div className="flex items-center justify-between">
+                <button
+                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  type="submit"
+                >
+                  Entrar
+                </button>
+                <button
+                  className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
+                  type="button"
+                  onClick={() => setShowAdminLoginModal(false)}
+                >
+                  Cancelar
+                </button>
               </div>
             </form>
           </div>
