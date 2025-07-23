@@ -1,57 +1,11 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { AdminSettings, FormData, ProductDetails, EmailResult } from './types';
+import OrderForm from './OrderForm';
+import SuccessPage from './SuccessPage';
+import AdminPanel from './AdminPanel';
 
-interface FormData {
-  nome: string;
-  whatsapp: string;
-  email: string;
-  estado: string; // Estado para entrega
-  sabores: string[];
-  quantity: number; // Total de unidades
-}
-
-interface ProductDetails {
-  id: string;
-  name: string;
-  description: string;
-  price: number; // Preço por pacote de 100 unidades
-}
-
-interface AdminSettings {
-  adminEmail: string;
-  adminWhatsapp: string;
-  orientationVideoUrl: string;
-  callMeBotApiKey: string;
-  emailJsServiceId: string;
-  emailJsTemplateIdAdmin: string;
-  emailJsTemplateIdUser: string;
-  emailJsPublicKey: string;
-  pixKey: string;
-  cnpj: string;
-}
-
-interface EmailResult {
-  success: boolean;
-  error?: any;
-}
-
-const MINIMUM_UNITS = 500;
-const UNITS_PER_PACKAGE = 100;
-const OLD_PRICE = 31.52; // Preço original para exibição
-
-// Produto único e fixo
-const mainProduct: ProductDetails = {
-  id: 'etiquetas_comestiveis',
-  name: 'Etiquetas Comestíveis Personalizadas',
-  description: 'Etiquetas personalizadas com o sabor à sua escolha para aplicar nos seus crepes.\nDesconto exclusivo de 20% para alunas do curso Minha Fábrica de Crepes.',
-  price: 25.21, // Preço com desconto
-};
-
-const brazilianStates = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 
-  'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
-];
-
+// Funções utilitárias movidas para fora do componente para clareza
 const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: string, apiKey: string): Promise<void> => {
   if (!apiKey || !adminPhoneNumber) {
     console.warn("CallMeBot API Key ou número do admin não configurado. WhatsApp não enviado.");
@@ -63,12 +17,8 @@ const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: strin
 
   try {
     const response = await fetch(url, { method: 'GET' });
-    if (response.ok) {
-      console.log("Mensagem do WhatsApp enviada via CallMeBot com sucesso!");
-    } else {
-      const errorText = await response.text();
-      console.error("Erro ao enviar mensagem via CallMeBot:", response.status, errorText);
-    }
+    if (response.ok) console.log("Mensagem do WhatsApp enviada via CallMeBot com sucesso!");
+    else console.error("Erro ao enviar mensagem via CallMeBot:", response.status, await response.text());
   } catch (error) {
     console.error("Erro de rede ao tentar enviar mensagem via CallMeBot:", error);
   }
@@ -86,42 +36,41 @@ const sendEmailViaEmailJS = async (
     return { success: false, error: errorMessage };
   }
   if (typeof (window as any).emailjs === 'undefined') {
-    const errorMessage = "SDK do EmailJS não carregado. Verifique se o script foi adicionado ao index.html.";
+    const errorMessage = "SDK do EmailJS não carregado.";
     console.error(errorMessage);
     return { success: false, error: errorMessage };
   }
-
   try {
     await (window as any).emailjs.send(serviceId, templateId, templateParams, publicKey);
-    console.log(`E-mail enviado com sucesso usando o template ${templateId} via EmailJS.`);
     return { success: true };
   } catch (error) {
-    console.error(`Erro ao enviar e-mail com o template ${templateId} via EmailJS:`, error);
-    const errorText = (error instanceof Error) ? error.message : (typeof error === 'object' && error !== null) ? JSON.stringify(error) : 'Erro desconhecido';
+    const errorText = (error instanceof Error) ? error.message : JSON.stringify(error);
     return { success: false, error: `Falha no envio: ${errorText}` };
   }
 };
 
-
 const App: React.FC = () => {
-  const [editableProduct, setEditableProduct] = useState<ProductDetails>(mainProduct);
-
-  const [formData, setFormData] = useState<FormData>({
-    nome: '',
-    whatsapp: '',
-    email: '',
-    estado: '',
-    quantity: MINIMUM_UNITS,
-    sabores: Array(MINIMUM_UNITS / UNITS_PER_PACKAGE).fill(''),
+  const [editableProduct, setEditableProduct] = useState<ProductDetails>({
+    id: 'etiquetas_comestiveis',
+    name: 'Etiquetas Comestíveis Personalizadas',
+    description: 'Etiquetas personalizadas com o sabor à sua escolha para aplicar nos seus crepes.\nDesconto exclusivo de 20% para alunas do curso Minha Fábrica de Crepes.',
+    price: 25.21,
   });
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  
+  const [formData, setFormData] = useState<FormData>({
+    nome: '', whatsapp: '', email: '',
+    cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
+    quantity: 500, sabores: Array(500 / 100).fill(''),
+  });
 
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'error'>('idle');
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  
   const [isAdminView, setIsAdminView] = useState<boolean>(false);
   const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false);
   const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
-  const [testEmailStatus, setTestEmailStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
-
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     adminEmail: 'atendimento@printfoods.com.br',
@@ -132,8 +81,10 @@ const App: React.FC = () => {
     emailJsTemplateIdAdmin: '',
     emailJsTemplateIdUser: '',
     emailJsPublicKey: '',
-    pixKey: '',
+    pixKey: 'beaf7a1f-df15-4695-aa30-593c46629de7',
     cnpj: '',
+    logoBase64: '',
+    pixQrBase64: '',
   });
 
   useEffect(() => {
@@ -143,7 +94,7 @@ const App: React.FC = () => {
         const parsedSettings = JSON.parse(savedSettings);
         setAdminSettings(prev => ({ ...prev, ...parsedSettings }));
       } catch (error) {
-        console.error("Failed to parse admin settings from localStorage", error);
+        console.error("Falha ao analisar as configurações de administrador do localStorage", error);
       }
     }
   }, []);
@@ -152,121 +103,82 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
     } catch (error) {
-      console.error("Failed to save admin settings to localStorage", error);
+      console.error("Falha ao salvar as configurações de administrador no localStorage", error);
     }
   }, [adminSettings]);
 
-  const subtotal = useMemo(() => {
-    const numPackages = formData.quantity / UNITS_PER_PACKAGE;
-    return numPackages * editableProduct.price;
-  }, [formData.quantity, editableProduct.price]);
-
+  const subtotal = useMemo(() => (formData.quantity / 100) * editableProduct.price, [formData.quantity, editableProduct.price]);
   const shippingCost = useMemo(() => {
     if (!formData.estado) return 0;
     const specialStates = ['RJ', 'SP', 'MG', 'ES'];
     return specialStates.includes(formData.estado) ? 25 : 35;
   }, [formData.estado]);
-
   const grandTotal = useMemo(() => subtotal + shippingCost, [subtotal, shippingCost]);
-
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newQuantity = parseInt(e.target.value, 10);
-    if (e.type === 'blur') {
-        if (isNaN(newQuantity) || newQuantity < MINIMUM_UNITS) {
-            newQuantity = MINIMUM_UNITS;
-        }
-        newQuantity = Math.round(newQuantity / UNITS_PER_PACKAGE) * UNITS_PER_PACKAGE;
-        if (newQuantity < MINIMUM_UNITS) newQuantity = MINIMUM_UNITS;
-    }
-    if (isNaN(newQuantity)) newQuantity = MINIMUM_UNITS;
-    if (newQuantity > 5000) newQuantity = 5000;
-
-    setFormData(prev => {
-        const numPackages = Math.ceil(newQuantity / UNITS_PER_PACKAGE);
-        const currentSabores = prev.sabores;
-        const newSabores = Array.from({ length: numPackages }, (_, i) => currentSabores[i] || '');
-        return { ...prev, quantity: newQuantity, sabores: newSabores };
-    });
-  };
-
-  const handleFlavorChange = (index: number, value: string) => {
-    const newSabores = [...formData.sabores];
-    newSabores[index] = value;
-    setFormData(prev => ({ ...prev, sabores: newSabores }));
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prevData => ({ ...prevData, [name]: value }));
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const productName = editableProduct.name;
-    const quantity = formData.quantity;
-    const numPackages = formData.quantity / UNITS_PER_PACKAGE;
-    const saboresList = formData.sabores.slice(0, numPackages).map((sabor, index) => `Pacote ${index + 1}: ${sabor || 'Não especificado'}`).join('\n');
-    const saboresListPlain = formData.sabores.slice(0, numPackages).map(s => s || 'N/A').join(', ');
-    const userName = formData.nome;
-    const userWhatsAppInput = formData.whatsapp;
-    const userEmail = formData.email;
-    const deliveryState = formData.estado;
+    setSubmissionStatus('submitting');
+    setSubmissionError(null);
 
-    if (adminSettings.emailJsServiceId && adminSettings.emailJsTemplateIdAdmin && adminSettings.emailJsPublicKey) {
-      const adminEmailParams = {
-        product_name: productName,
-        quantity: `${quantity} unidades (${numPackages} pacotes)`,
+    const { quantity, sabores, nome, whatsapp, email, ...address } = formData;
+    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey, emailJsTemplateIdUser, callMeBotApiKey, adminWhatsapp, orientationVideoUrl, adminEmail, cnpj, pixKey } = adminSettings;
+
+    const numPackages = quantity / 100;
+    const saboresList = sabores.slice(0, numPackages).map((s, i) => `Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
+    const fullAddress = `${address.logradouro}, ${address.numero} - ${address.bairro}, ${address.cidade} - ${address.estado}, CEP: ${address.cep}`;
+    const pixToDisplay = pixKey || cnpj;
+
+    try {
+      const adminParams = {
+        ...formData,
+        product_name: editableProduct.name,
+        quantity_text: `${quantity} unidades (${numPackages} pacotes)`,
         sabores_list: saboresList,
+        full_address: fullAddress,
         subtotal: subtotal.toFixed(2),
         shipping_cost: shippingCost.toFixed(2),
         grand_total: grandTotal.toFixed(2),
-        user_name: userName,
-        user_whatsapp: userWhatsAppInput,
-        user_email: userEmail,
-        delivery_state: deliveryState,
-        reply_to: userEmail,
+        reply_to: email,
       };
-      await sendEmailViaEmailJS(adminSettings.emailJsServiceId, adminSettings.emailJsTemplateIdAdmin, adminEmailParams, adminSettings.emailJsPublicKey);
-    }
+      const adminResult = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, adminParams, emailJsPublicKey);
+      if (!adminResult.success) throw new Error(`Falha ao notificar admin. Detalhe: ${adminResult.error}`);
 
-    const adminWhatsAppMessage = `Novo Pedido Print Foods: ${quantity}x ${productName} por ${userName}. Entrega: ${deliveryState}. Sabores: ${saboresListPlain}. Total: R$${grandTotal.toFixed(2)} (Produtos R$${subtotal.toFixed(2)} + Frete R$${shippingCost.toFixed(2)}). Contato: ${userWhatsAppInput}`;
-    if (adminSettings.callMeBotApiKey && adminSettings.adminWhatsapp) {
-      await sendWhatsAppViaCallMeBot(adminWhatsAppMessage, adminSettings.adminWhatsapp, adminSettings.callMeBotApiKey);
-    }
-
-    const pixToDisplay = adminSettings.pixKey || adminSettings.cnpj;
-    if (adminSettings.emailJsServiceId && adminSettings.emailJsTemplateIdUser && adminSettings.emailJsPublicKey) {
-      const userEmailParams = {
-        user_name: userName,
-        user_recipient_email: userEmail,
-        product_name: productName,
-        quantity: `${quantity} unidades (${numPackages} pacotes)`,
-        sabores_list: saboresList,
-        subtotal: subtotal.toFixed(2),
-        shipping_cost: shippingCost.toFixed(2),
-        grand_total: grandTotal.toFixed(2),
-        delivery_state: deliveryState,
-        orientation_video_url: adminSettings.orientationVideoUrl,
-        admin_whatsapp_contact: adminSettings.adminWhatsapp,
-        admin_reply_to_email: adminSettings.adminEmail,
-        company_cnpj: adminSettings.cnpj,
+      const userParams = {
+        ...adminParams,
+        user_recipient_email: email,
+        orientation_video_url: orientationVideoUrl,
+        admin_whatsapp_contact: adminWhatsapp,
+        admin_reply_to_email: adminEmail,
+        company_cnpj: cnpj,
         pix_key_info: pixToDisplay,
       };
-      await sendEmailViaEmailJS(adminSettings.emailJsServiceId, adminSettings.emailJsTemplateIdUser, userEmailParams, adminSettings.emailJsPublicKey);
+      const userResult = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdUser, userParams, emailJsPublicKey);
+      if (!userResult.success) throw new Error(`Falha ao enviar confirmação ao cliente. Detalhe: ${userResult.error}`);
+
+      const whatsappMessage = `Novo Pedido: ${quantity}x ${editableProduct.name} por ${nome}. Total: R$${grandTotal.toFixed(2)}. Contato: ${whatsapp}`;
+      if (callMeBotApiKey && adminWhatsapp) {
+        await sendWhatsAppViaCallMeBot(whatsappMessage, adminWhatsapp, callMeBotApiKey);
+      }
+
+      setIsSubmitted(true);
+    } catch (error) {
+      const msg = (error instanceof Error) ? error.message : 'Ocorreu um erro desconhecido.';
+      setSubmissionError(msg);
+      setSubmissionStatus('error');
     }
-    setIsSubmitted(true);
   };
 
   const handleNewRegistration = () => {
-    setFormData({ nome: '', whatsapp: '', email: '', estado: '', quantity: MINIMUM_UNITS, sabores: Array(MINIMUM_UNITS / UNITS_PER_PACKAGE).fill('') });
+    setFormData({
+        nome: '', whatsapp: '', email: '',
+        cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
+        quantity: 500, sabores: Array(5).fill(''),
+    });
     setIsSubmitted(false);
+    setSubmissionStatus('idle');
+    setSubmissionError(null);
   };
-
-  const handleAdminLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setAdminCredentials(prev => ({ ...prev, [name]: value }));
-  };
-
+  
   const handleAdminLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const adminUser = process.env.ADMIN_USERNAME || 'admin';
@@ -281,290 +193,62 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAdminProductChange = (field: keyof ProductDetails, value: string | number) => {
-    setEditableProduct(prevProduct => ({ ...prevProduct, [field]: field === 'price' ? Number(value) : value }));
-  };
-
-  const handleAdminSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setAdminSettings(prev => ({ ...prev, [name]: value as any }));
-  };
-
   const handleTestEmail = async () => {
-    setTestEmailStatus({ message: 'Enviando e-mail de teste...', type: '' });
     const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey, adminEmail } = adminSettings;
-
-    if (!emailJsServiceId || !emailJsTemplateIdAdmin || !emailJsPublicKey || !adminEmail) {
-        setTestEmailStatus({ message: 'Erro: Preencha o Service ID, Template ID (Admin), Public Key e E-mail do Administrador.', type: 'error' });
-        return;
-    }
-
     const testParams = {
-        product_name: "E-mail de Teste de Configuração",
-        quantity: "N/A",
-        sabores_list: "Este é um e-mail de teste enviado a partir do painel administrativo para verificar se as configurações do EmailJS estão corretas. Se você recebeu este e-mail, a notificação para o administrador está funcionando.",
-        subtotal: "0.00",
-        shipping_cost: "0.00",
-        grand_total: "0.00",
+        product_name: "E-mail de Teste",
+        sabores_list: "Teste de configuração do EmailJS.",
         user_name: "Sistema Print Foods",
-        user_whatsapp: "N/A",
-        user_email: "sistema@printfoods.com.br",
-        delivery_state: "N/A",
         reply_to: adminEmail,
     };
-
-    const result = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, testParams, emailJsPublicKey);
-
-    if (result.success) {
-        setTestEmailStatus({ message: `Sucesso! Um e-mail de teste foi enviado para o endereço configurado no seu Template de Admin no EmailJS. Verifique a caixa de entrada.`, type: 'success' });
-    } else {
-        setTestEmailStatus({ message: `Falha ao enviar. Verifique suas chaves e configurações no EmailJS. Detalhe: ${result.error}`, type: 'error' });
-    }
+    return await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, testParams, emailJsPublicKey);
   };
 
-
+  // Render Logic
   if (isAdminView) {
     return (
-      <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
-        <div className="bg-white p-6 sm:p-10 rounded-xl shadow-lg w-full max-w-4xl mx-auto">
-          <header className="flex justify-between items-center mb-10">
-            <div className="flex items-center gap-4">
-                <h1 className="text-3xl font-bold text-blue-800">Print Foods®</h1>
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">Painel Administrativo</h2>
-            </div>
-            <button onClick={() => setIsAdminView(false)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors">Sair do Admin</button>
-          </header>
-
-          <div className="space-y-8 mb-8">
-            <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
-                <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b border-blue-200 pb-3">Informações da Loja e Pagamento</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
-                    <div>
-                        <label htmlFor="cnpj" className="block text-sm font-medium text-gray-700">CNPJ da Empresa</label>
-                        <input type="text" id="cnpj" name="cnpj" value={adminSettings.cnpj} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="00.000.000/0001-00"/>
-                        <p className="mt-1 text-xs text-gray-500">Será exibido na página de pagamento.</p>
-                    </div>
-                    <div>
-                        <label htmlFor="pixKey" className="block text-sm font-medium text-gray-700">Chave PIX para Pagamento</label>
-                        <input type="text" id="pixKey" name="pixKey" value={adminSettings.pixKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="E-mail, telefone, etc."/>
-                        <p className="mt-1 text-xs text-gray-500">Deixe em branco para usar o CNPJ como Chave PIX.</p>
-                    </div>
-                    <div className="md:col-span-2">
-                        <label htmlFor="orientationVideoUrl" className="block text-sm font-medium text-gray-700">URL do Vídeo de Orientação</label>
-                        <input type="url" id="orientationVideoUrl" name="orientationVideoUrl" value={adminSettings.orientationVideoUrl} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="https://youtube.com/seu-video"/>
-                        <p className="mt-1 text-xs text-gray-500">Link enviado no e-mail de confirmação ao cliente.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
-                <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b border-blue-200 pb-3">Configurações de Notificação</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 mb-8">
-                    <div>
-                        <label htmlFor="adminEmail" className="block text-sm font-medium text-gray-700">E-mail do Administrador</label>
-                        <input type="email" id="adminEmail" name="adminEmail" value={adminSettings.adminEmail} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="seu-email@provedor.com"/>
-                        <p className="mt-1 text-xs text-gray-500">E-mail para responder ao cliente. O e-mail que recebe os avisos é configurado no EmailJS.</p>
-                    </div>
-                    <div>
-                        <label htmlFor="adminWhatsapp" className="block text-sm font-medium text-gray-700">WhatsApp do Administrador</label>
-                        <input type="tel" id="adminWhatsapp" name="adminWhatsapp" value={adminSettings.adminWhatsapp} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="5511987654321"/>
-                        <p className="mt-1 text-xs text-gray-500">Para notificações e contato do cliente.</p>
-                    </div>
-                </div>
-                
-                <div className="space-y-8">
-                    <div>
-                        <h4 className="text-lg font-semibold text-blue-600 mb-4">Integração com CallMeBot (WhatsApp)</h4>
-                        <div>
-                            <label htmlFor="callMeBotApiKey" className="block text-sm font-medium text-gray-700">API Key do CallMeBot</label>
-                            <input type="text" id="callMeBotApiKey" name="callMeBotApiKey" value={adminSettings.callMeBotApiKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                            <p className="mt-1 text-xs text-gray-500">Sua chave da API encontrada no site do CallMeBot.</p>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-lg font-semibold text-blue-600 mb-4">Integração com EmailJS</h4>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
-                            <div>
-                                <label htmlFor="emailJsServiceId" className="block text-sm font-medium text-gray-700">Service ID</label>
-                                <input type="text" id="emailJsServiceId" name="emailJsServiceId" value={adminSettings.emailJsServiceId} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="service_xxxxxxxx"/>
-                                <p className="mt-1 text-xs text-gray-500">Em Email Services &gt; (seu serviço) &gt; copie o Service ID.</p>
-                            </div>
-                             <div>
-                                <label htmlFor="emailJsPublicKey" className="block text-sm font-medium text-gray-700">Public Key</label>
-                                <input type="text" id="emailJsPublicKey" name="emailJsPublicKey" value={adminSettings.emailJsPublicKey} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Sua_Public_Key"/>
-                                <p className="mt-1 text-xs text-gray-500">Em Account &gt; API Keys &gt; copie a Public Key.</p>
-                            </div>
-                             <div>
-                                <label htmlFor="emailJsTemplateIdAdmin" className="block text-sm font-medium text-gray-700">Template ID (Admin)</label>
-                                <input type="text" id="emailJsTemplateIdAdmin" name="emailJsTemplateIdAdmin" value={adminSettings.emailJsTemplateIdAdmin} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="template_xxxxxxxx"/>
-                                <p className="mt-1 text-xs text-gray-500">ID do template de e-mail para notificar o admin.</p>
-                            </div>
-                             <div>
-                                <label htmlFor="emailJsTemplateIdUser" className="block text-sm font-medium text-gray-700">Template ID (Cliente)</label>
-                                <input type="text" id="emailJsTemplateIdUser" name="emailJsTemplateIdUser" value={adminSettings.emailJsTemplateIdUser} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="template_xxxxxxxx"/>
-                                <p className="mt-1 text-xs text-gray-500">ID do template de e-mail de confirmação para o cliente.</p>
-                            </div>
-                         </div>
-                         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
-                            <h5 className="font-bold text-yellow-800">Instruções Importantes para Templates do EmailJS</h5>
-                            <ul className="list-disc list-inside text-sm text-yellow-900 mt-2 space-y-1">
-                                <li><strong>Template do Admin:</strong> No campo "To Email" das configurações do seu template, digite o seu e-mail de administrador (o que receberá os avisos). No campo "Reply-To", insira a variável <code>{`{{reply_to}}`}</code>.</li>
-                                <li><strong>Template do Cliente:</strong> No campo "To Email", insira a variável <code>{`{{user_recipient_email}}`}</code>.</li>
-                            </ul>
-                            <p className="text-sm text-yellow-900 mt-2">Certifique-se de que os nomes das outras variáveis (ex: <code>{`{{user_name}}`}</code>) no seu template correspondem às usadas no aplicativo.</p>
-                        </div>
-                        <div className="mt-6">
-                            <button type="button" onClick={handleTestEmail} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors disabled:bg-indigo-300">
-                                Testar Envio de E-mail para Admin
-                            </button>
-                            {testEmailStatus.message && (
-                                <p className={`mt-2 text-sm font-medium ${testEmailStatus.type === 'success' ? 'text-green-700' : testEmailStatus.type === 'error' ? 'text-red-700' : 'text-gray-700'}`}>
-                                    {testEmailStatus.message}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-          </div>
-          
-          <h2 className="text-xl font-semibold text-blue-800 mb-4">Gerenciamento de Produto</h2>
-            <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
-              <h3 className="text-lg font-semibold text-blue-700 mb-4">Editando: {editableProduct.name}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label htmlFor={`name-${editableProduct.id}`} className="block text-sm font-medium text-gray-700 mb-1">Nome do Produto:</label>
-                  <input type="text" id={`name-${editableProduct.id}`} value={editableProduct.name} onChange={(e) => handleAdminProductChange('name', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                </div>
-                <div>
-                  <label htmlFor={`price-${editableProduct.id}`} className="block text-sm font-medium text-gray-700 mb-1">Preço com Desconto (R$):</label>
-                  <input type="number" id={`price-${editableProduct.id}`} value={editableProduct.price} onChange={(e) => handleAdminProductChange('price', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-                </div>
-              </div>
-              <div className="mb-4">
-                <label htmlFor={`description-${editableProduct.id}`} className="block text-sm font-medium text-gray-700 mb-1">Descrição (use '\n' para nova linha):</label>
-                <textarea id={`description-${editableProduct.id}`} value={editableProduct.description} rows={4} onChange={(e) => handleAdminProductChange('description', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"/>
-              </div>
-            </div>
-        </div>
-      </div>
+      <AdminPanel
+        adminSettings={adminSettings}
+        setAdminSettings={setAdminSettings}
+        editableProduct={editableProduct}
+        setEditableProduct={setEditableProduct}
+        onTestEmail={handleTestEmail}
+        onExitAdmin={() => setIsAdminView(false)}
+      />
     );
   }
 
   if (isSubmitted) {
-    const pixToDisplay = adminSettings.pixKey || adminSettings.cnpj;
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-2xl">
-           <div className="text-center p-4 sm:p-8 bg-green-50 rounded-lg shadow-lg border-2 border-green-200">
-                <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-4">Pedido Enviado com Sucesso!</h2>
-                <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e em breve entraremos em contato pelo WhatsApp para confirmar os detalhes do pagamento e da entrega.</p>
-                <div className="bg-white p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3 mb-6">
-                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-3">Resumo do Pedido</h3>
-                    <p className="text-gray-700"><strong>Produto:</strong> {editableProduct.name}</p>
-                    <p className="text-gray-700"><strong>Quantidade:</strong> {formData.quantity} unidades</p>
-                    <p className="text-gray-700"><strong>Subtotal:</strong> R$ {subtotal.toFixed(2)}</p>
-                    <p className="text-gray-700"><strong>Frete para {formData.estado}:</strong> R$ {shippingCost.toFixed(2)}</p>
-                    <p className="text-lg font-bold text-gray-800"><strong>Total:</strong> R$ {grandTotal.toFixed(2)}</p>
-                </div>
-                <div className="bg-blue-50 p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3">
-                    <h3 className="text-lg font-semibold text-blue-800 border-b pb-2 mb-3">Instruções para Pagamento</h3>
-                    <p className="text-gray-700">Para agilizar, realize o pagamento no valor total de <strong className="font-bold text-blue-900">R$ {grandTotal.toFixed(2)}</strong> via PIX e envie o comprovante para o nosso WhatsApp.</p>
-                    <div className="mt-4 p-4 bg-gray-100 rounded-md space-y-2">
-                        {adminSettings.cnpj && <p className="text-gray-800"><strong className="font-semibold">CNPJ:</strong> {adminSettings.cnpj}</p>}
-                        {pixToDisplay && <p className="text-gray-800"><strong className="font-semibold">Chave PIX:</strong> {pixToDisplay}</p>}
-                    </div>
-                    <p className="text-gray-700 mt-4">Nosso WhatsApp para envio do comprovante e dúvidas é: <strong className="font-semibold">{adminSettings.adminWhatsapp}</strong></p>
-                    {adminSettings.orientationVideoUrl && (
-                        <p className="text-sm text-gray-600 mt-4">Assista nosso <a href={adminSettings.orientationVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">vídeo de orientação</a> sobre como aplicar as etiquetas.</p>
-                    )}
-                </div>
-                <button onClick={handleNewRegistration} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-300">Fazer Novo Pedido</button>
-            </div>
-        </div>
-      </div>
+      <SuccessPage
+        formData={formData}
+        adminSettings={adminSettings}
+        orderTotals={{ subtotal, shippingCost, grandTotal }}
+        productName={editableProduct.name}
+        onNewOrder={handleNewRegistration}
+      />
     );
   }
-
+  
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 font-sans">
-      <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-2xl transition-all duration-500 ease-in-out">
-        {!isSubmitted ? (
-          <>
-            <header className="text-center mb-8">
-              <h1 className="text-4xl sm:text-5xl font-bold text-blue-800">Print Foods®</h1>
-              <p className="text-gray-600 mt-2">Olá, aluna do curso Minha Fábrica de Crepes! Faça seu pedido aqui.</p>
-            </header>
-            
-            <section className="mb-8 p-6 bg-blue-50 rounded-lg shadow-inner border border-blue-200">
-              <h2 className="text-xl font-semibold text-blue-800 mb-2">{editableProduct.name}</h2>
-              {editableProduct.description.split('\n').map((line, index) => (<p key={index} className="text-gray-700 mb-1">{line}</p>))}
-              <p className="text-lg font-bold text-blue-800 mt-4">Valor por pacote com 100 unidades: <br /><span className="text-gray-500 line-through mr-2">De R$ {OLD_PRICE.toFixed(2)}</span> por apenas R$ {editableProduct.price.toFixed(2)}</p>
-            </section>
-            
-            <form id="formulario" onSubmit={handleSubmit} className="space-y-6 mt-4">
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                    <h3 className="block text-lg font-medium text-gray-800 mb-4">1. Personalize seu Pedido:</h3>
-                    <div className="mb-6">
-                        <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Etiquetas (mín. {MINIMUM_UNITS}, em múltiplos de {UNITS_PER_PACKAGE}):</label>
-                        <input type="number" id="quantity" name="quantity" value={formData.quantity} onChange={handleQuantityChange} onBlur={handleQuantityChange} min={MINIMUM_UNITS} step={UNITS_PER_PACKAGE} required className="mt-1 block w-full max-w-xs px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Texto de cada pacote de 100 etiquetas (Sabor):</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {formData.sabores.map((sabor, index) => (
-                                <div key={index}>
-                                    <label htmlFor={`sabor-${index}`} className="block text-xs text-gray-600 mb-1">Pacote {index + 1}:</label>
-                                    <input type="text" id={`sabor-${index}`} value={sabor} onChange={(e) => handleFlavorChange(index, e.target.value)} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Chocolate"/>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                    <h3 className="block text-lg font-medium text-gray-800 mb-4">2. Seus Dados e Entrega:</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label htmlFor="nome" className="block text-sm font-medium text-gray-700">Nome Completo:</label>
-                            <input type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                        </div>
-                        <div>
-                            <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700">WhatsApp (com DDD):</label>
-                            <input type="tel" id="whatsapp" name="whatsapp" value={formData.whatsapp} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: 11987654321"/>
-                        </div>
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">E-mail:</label>
-                            <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                        </div>
-                        <div>
-                            <label htmlFor="estado" className="block text-sm font-medium text-gray-700">Estado para Entrega:</label>
-                            <select id="estado" name="estado" value={formData.estado} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="" disabled>Selecione um estado</option>
-                                {brazilianStates.map(state => <option key={state} value={state}>{state}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div className="p-6 bg-blue-100 rounded-lg shadow-md mt-6">
-                    <h3 className="text-xl font-semibold text-blue-800 mb-4">Resumo do Pedido</h3>
-                    <div className="space-y-2 text-gray-700">
-                        <div className="flex justify-between"><span>Subtotal dos Produtos:</span> <span>R$ {subtotal.toFixed(2)}</span></div>
-                        <div className="flex justify-between"><span>Frete (para {formData.estado || '...'}):</span> <span>R$ {shippingCost.toFixed(2)}</span></div>
-                        <hr className="my-2 border-blue-200"/>
-                        <div className="flex justify-between text-lg font-bold text-blue-900"><span>Valor Total:</span> <span>R$ {grandTotal.toFixed(2)}</span></div>
-                    </div>
-                </div>
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300">Finalizar Pedido e Ver Dados de Pagamento</button>
-            </form>
-          </>
-        ) : null}
-        {!isSubmitted && (
-            <footer className="text-center mt-8">
-              <button onClick={() => setShowAdminLoginModal(true)} className="text-sm text-gray-400 hover:text-blue-600 transition-colors">Acesso Administrativo</button>
-            </footer>
-        )}
-      </div>
+      <OrderForm
+        formData={formData}
+        setFormData={setFormData}
+        editableProduct={editableProduct}
+        orderTotals={{ subtotal, shippingCost, grandTotal }}
+        handleSubmit={handleSubmit}
+        submissionStatus={submissionStatus}
+        submissionError={submissionError}
+        setSubmissionStatus={setSubmissionStatus}
+        setSubmissionError={setSubmissionError}
+      />
+      <footer className="text-center mt-8">
+        <button onClick={() => setShowAdminLoginModal(true)} className="text-sm text-gray-400 hover:text-blue-600 transition-colors">
+          Acesso Administrativo
+        </button>
+      </footer>
+      
       {showAdminLoginModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
@@ -572,11 +256,11 @@ const App: React.FC = () => {
             <form onSubmit={handleAdminLoginSubmit}>
               <div className="mb-4">
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">Usuário</label>
-                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" type="text" name="username" value={adminCredentials.username} onChange={handleAdminLoginChange} />
+                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" type="text" name="username" value={adminCredentials.username} onChange={e => setAdminCredentials({...adminCredentials, username: e.target.value})} />
               </div>
               <div className="mb-6">
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Senha</label>
-                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" type="password" name="password" value={adminCredentials.password} onChange={handleAdminLoginChange} />
+                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" type="password" name="password" value={adminCredentials.password} onChange={e => setAdminCredentials({...adminCredentials, password: e.target.value})} />
                 {adminLoginError && <p className="text-red-500 text-xs italic">{adminLoginError}</p>}
               </div>
               <div className="flex items-center justify-between">
