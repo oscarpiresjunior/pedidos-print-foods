@@ -30,6 +30,11 @@ interface AdminSettings {
   cnpj: string;
 }
 
+interface EmailResult {
+  success: boolean;
+  error?: any;
+}
+
 const MINIMUM_UNITS = 500;
 const UNITS_PER_PACKAGE = 100;
 const OLD_PRICE = 31.52; // Preço original para exibição
@@ -74,27 +79,31 @@ const sendEmailViaEmailJS = async (
   templateId: string,
   templateParams: Record<string, unknown>,
   publicKey: string
-): Promise<void> => {
+): Promise<EmailResult> => {
   if (!serviceId || !templateId || !publicKey) {
-    console.warn("Configurações do EmailJS (Service ID, Template ID, ou Public Key) incompletas. E-mail não enviado.");
-    return;
+    const errorMessage = "Configurações do EmailJS (Service ID, Template ID, ou Public Key) incompletas.";
+    console.warn(errorMessage);
+    return { success: false, error: errorMessage };
   }
   if (typeof (window as any).emailjs === 'undefined') {
-    console.error("SDK do EmailJS não carregado. Verifique se o script foi adicionado ao index.html.");
-    return;
+    const errorMessage = "SDK do EmailJS não carregado. Verifique se o script foi adicionado ao index.html.";
+    console.error(errorMessage);
+    return { success: false, error: errorMessage };
   }
 
   try {
     await (window as any).emailjs.send(serviceId, templateId, templateParams, publicKey);
     console.log(`E-mail enviado com sucesso usando o template ${templateId} via EmailJS.`);
+    return { success: true };
   } catch (error) {
     console.error(`Erro ao enviar e-mail com o template ${templateId} via EmailJS:`, error);
+    const errorText = (error instanceof Error) ? error.message : (typeof error === 'object' && error !== null) ? JSON.stringify(error) : 'Erro desconhecido';
+    return { success: false, error: `Falha no envio: ${errorText}` };
   }
 };
 
 
 const App: React.FC = () => {
-  // O produto agora é editável apenas no admin
   const [editableProduct, setEditableProduct] = useState<ProductDetails>(mainProduct);
 
   const [formData, setFormData] = useState<FormData>({
@@ -111,6 +120,8 @@ const App: React.FC = () => {
   const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false);
   const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
+  const [testEmailStatus, setTestEmailStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
+
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     adminEmail: 'atendimento@printfoods.com.br',
@@ -125,28 +136,25 @@ const App: React.FC = () => {
     cnpj: '',
   });
 
-  // Load settings from localStorage on initial render
   useEffect(() => {
     const savedSettings = localStorage.getItem('adminSettings');
     if (savedSettings) {
       try {
         const parsedSettings = JSON.parse(savedSettings);
-        // Merge with defaults to ensure all keys are present
         setAdminSettings(prev => ({ ...prev, ...parsedSettings }));
       } catch (error) {
         console.error("Failed to parse admin settings from localStorage", error);
       }
     }
-  }, []); // Empty dependency array means this runs once on mount
+  }, []);
 
-  // Save settings to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
     } catch (error) {
       console.error("Failed to save admin settings to localStorage", error);
     }
-  }, [adminSettings]); // This runs whenever adminSettings changes
+  }, [adminSettings]);
 
   const subtotal = useMemo(() => {
     const numPackages = formData.quantity / UNITS_PER_PACKAGE;
@@ -163,20 +171,15 @@ const App: React.FC = () => {
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newQuantity = parseInt(e.target.value, 10);
-
-    // Na saída do campo, garante as regras de negócio
     if (e.type === 'blur') {
         if (isNaN(newQuantity) || newQuantity < MINIMUM_UNITS) {
             newQuantity = MINIMUM_UNITS;
         }
-        // Arredonda para o múltiplo de 100 mais próximo
         newQuantity = Math.round(newQuantity / UNITS_PER_PACKAGE) * UNITS_PER_PACKAGE;
         if (newQuantity < MINIMUM_UNITS) newQuantity = MINIMUM_UNITS;
     }
-
     if (isNaN(newQuantity)) newQuantity = MINIMUM_UNITS;
-
-    if (newQuantity > 5000) newQuantity = 5000; // Safety limit: 50 pacotes
+    if (newQuantity > 5000) newQuantity = 5000;
 
     setFormData(prev => {
         const numPackages = Math.ceil(newQuantity / UNITS_PER_PACKAGE);
@@ -199,7 +202,6 @@ const App: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     const productName = editableProduct.name;
     const quantity = formData.quantity;
     const numPackages = formData.quantity / UNITS_PER_PACKAGE;
@@ -210,7 +212,6 @@ const App: React.FC = () => {
     const userEmail = formData.email;
     const deliveryState = formData.estado;
 
-    // 1. Notify Admin via EmailJS
     if (adminSettings.emailJsServiceId && adminSettings.emailJsTemplateIdAdmin && adminSettings.emailJsPublicKey) {
       const adminEmailParams = {
         product_name: productName,
@@ -223,24 +224,16 @@ const App: React.FC = () => {
         user_whatsapp: userWhatsAppInput,
         user_email: userEmail,
         delivery_state: deliveryState,
-        admin_recipient_email: adminSettings.adminEmail,
         reply_to: userEmail,
       };
-      await sendEmailViaEmailJS(
-        adminSettings.emailJsServiceId,
-        adminSettings.emailJsTemplateIdAdmin,
-        adminEmailParams,
-        adminSettings.emailJsPublicKey
-      );
+      await sendEmailViaEmailJS(adminSettings.emailJsServiceId, adminSettings.emailJsTemplateIdAdmin, adminEmailParams, adminSettings.emailJsPublicKey);
     }
 
-    // 2. Notify Admin via WhatsApp (CallMeBot)
     const adminWhatsAppMessage = `Novo Pedido Print Foods: ${quantity}x ${productName} por ${userName}. Entrega: ${deliveryState}. Sabores: ${saboresListPlain}. Total: R$${grandTotal.toFixed(2)} (Produtos R$${subtotal.toFixed(2)} + Frete R$${shippingCost.toFixed(2)}). Contato: ${userWhatsAppInput}`;
     if (adminSettings.callMeBotApiKey && adminSettings.adminWhatsapp) {
       await sendWhatsAppViaCallMeBot(adminWhatsAppMessage, adminSettings.adminWhatsapp, adminSettings.callMeBotApiKey);
     }
 
-    // 3. Send Confirmation Email to User via EmailJS
     const pixToDisplay = adminSettings.pixKey || adminSettings.cnpj;
     if (adminSettings.emailJsServiceId && adminSettings.emailJsTemplateIdUser && adminSettings.emailJsPublicKey) {
       const userEmailParams = {
@@ -259,26 +252,13 @@ const App: React.FC = () => {
         company_cnpj: adminSettings.cnpj,
         pix_key_info: pixToDisplay,
       };
-      await sendEmailViaEmailJS(
-        adminSettings.emailJsServiceId,
-        adminSettings.emailJsTemplateIdUser,
-        userEmailParams,
-        adminSettings.emailJsPublicKey
-      );
+      await sendEmailViaEmailJS(adminSettings.emailJsServiceId, adminSettings.emailJsTemplateIdUser, userEmailParams, adminSettings.emailJsPublicKey);
     }
-
     setIsSubmitted(true);
   };
 
   const handleNewRegistration = () => {
-    setFormData({
-        nome: '',
-        whatsapp: '',
-        email: '',
-        estado: '',
-        quantity: MINIMUM_UNITS,
-        sabores: Array(MINIMUM_UNITS / UNITS_PER_PACKAGE).fill(''),
-    });
+    setFormData({ nome: '', whatsapp: '', email: '', estado: '', quantity: MINIMUM_UNITS, sabores: Array(MINIMUM_UNITS / UNITS_PER_PACKAGE).fill('') });
     setIsSubmitted(false);
   };
 
@@ -291,7 +271,6 @@ const App: React.FC = () => {
     e.preventDefault();
     const adminUser = process.env.ADMIN_USERNAME || 'admin';
     const adminPass = process.env.ADMIN_PASSWORD || 'admin';
-
     if (adminCredentials.username === adminUser && adminCredentials.password === adminPass) {
       setIsAdminView(true);
       setShowAdminLoginModal(false);
@@ -303,16 +282,46 @@ const App: React.FC = () => {
   };
 
   const handleAdminProductChange = (field: keyof ProductDetails, value: string | number) => {
-    setEditableProduct(prevProduct => ({
-      ...prevProduct,
-      [field]: field === 'price' ? Number(value) : value,
-    }));
+    setEditableProduct(prevProduct => ({ ...prevProduct, [field]: field === 'price' ? Number(value) : value }));
   };
 
   const handleAdminSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setAdminSettings(prev => ({ ...prev, [name]: value as any }));
   };
+
+  const handleTestEmail = async () => {
+    setTestEmailStatus({ message: 'Enviando e-mail de teste...', type: '' });
+    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey, adminEmail } = adminSettings;
+
+    if (!emailJsServiceId || !emailJsTemplateIdAdmin || !emailJsPublicKey || !adminEmail) {
+        setTestEmailStatus({ message: 'Erro: Preencha o Service ID, Template ID (Admin), Public Key e E-mail do Administrador.', type: 'error' });
+        return;
+    }
+
+    const testParams = {
+        product_name: "E-mail de Teste de Configuração",
+        quantity: "N/A",
+        sabores_list: "Este é um e-mail de teste enviado a partir do painel administrativo para verificar se as configurações do EmailJS estão corretas. Se você recebeu este e-mail, a notificação para o administrador está funcionando.",
+        subtotal: "0.00",
+        shipping_cost: "0.00",
+        grand_total: "0.00",
+        user_name: "Sistema Print Foods",
+        user_whatsapp: "N/A",
+        user_email: "sistema@printfoods.com.br",
+        delivery_state: "N/A",
+        reply_to: adminEmail,
+    };
+
+    const result = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, testParams, emailJsPublicKey);
+
+    if (result.success) {
+        setTestEmailStatus({ message: `Sucesso! Um e-mail de teste foi enviado para o endereço configurado no seu Template de Admin no EmailJS. Verifique a caixa de entrada.`, type: 'success' });
+    } else {
+        setTestEmailStatus({ message: `Falha ao enviar. Verifique suas chaves e configurações no EmailJS. Detalhe: ${result.error}`, type: 'error' });
+    }
+  };
+
 
   if (isAdminView) {
     return (
@@ -323,12 +332,7 @@ const App: React.FC = () => {
                 <h1 className="text-3xl font-bold text-blue-800">Print Foods®</h1>
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-700">Painel Administrativo</h2>
             </div>
-            <button
-              onClick={() => setIsAdminView(false)}
-              className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors"
-            >
-              Sair do Admin
-            </button>
+            <button onClick={() => setIsAdminView(false)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors">Sair do Admin</button>
           </header>
 
           <div className="space-y-8 mb-8">
@@ -359,7 +363,7 @@ const App: React.FC = () => {
                     <div>
                         <label htmlFor="adminEmail" className="block text-sm font-medium text-gray-700">E-mail do Administrador</label>
                         <input type="email" id="adminEmail" name="adminEmail" value={adminSettings.adminEmail} onChange={handleAdminSettingsChange} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="seu-email@provedor.com"/>
-                        <p className="mt-1 text-xs text-gray-500">E-mail que receberá os avisos de novos pedidos.</p>
+                        <p className="mt-1 text-xs text-gray-500">E-mail para responder ao cliente. O e-mail que recebe os avisos é configurado no EmailJS.</p>
                     </div>
                     <div>
                         <label htmlFor="adminWhatsapp" className="block text-sm font-medium text-gray-700">WhatsApp do Administrador</label>
@@ -402,6 +406,24 @@ const App: React.FC = () => {
                                 <p className="mt-1 text-xs text-gray-500">ID do template de e-mail de confirmação para o cliente.</p>
                             </div>
                          </div>
+                         <div className="mt-6 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                            <h5 className="font-bold text-yellow-800">Instruções Importantes para Templates do EmailJS</h5>
+                            <ul className="list-disc list-inside text-sm text-yellow-900 mt-2 space-y-1">
+                                <li><strong>Template do Admin:</strong> No campo "To Email" das configurações do seu template, digite o seu e-mail de administrador (o que receberá os avisos). No campo "Reply-To", insira a variável <code>{`{{reply_to}}`}</code>.</li>
+                                <li><strong>Template do Cliente:</strong> No campo "To Email", insira a variável <code>{`{{user_recipient_email}}`}</code>.</li>
+                            </ul>
+                            <p className="text-sm text-yellow-900 mt-2">Certifique-se de que os nomes das outras variáveis (ex: <code>{`{{user_name}}`}</code>) no seu template correspondem às usadas no aplicativo.</p>
+                        </div>
+                        <div className="mt-6">
+                            <button type="button" onClick={handleTestEmail} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors disabled:bg-indigo-300">
+                                Testar Envio de E-mail para Admin
+                            </button>
+                            {testEmailStatus.message && (
+                                <p className={`mt-2 text-sm font-medium ${testEmailStatus.type === 'success' ? 'text-green-700' : testEmailStatus.type === 'error' ? 'text-red-700' : 'text-gray-700'}`}>
+                                    {testEmailStatus.message}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -438,7 +460,6 @@ const App: React.FC = () => {
            <div className="text-center p-4 sm:p-8 bg-green-50 rounded-lg shadow-lg border-2 border-green-200">
                 <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-4">Pedido Enviado com Sucesso!</h2>
                 <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e em breve entraremos em contato pelo WhatsApp para confirmar os detalhes do pagamento e da entrega.</p>
-                
                 <div className="bg-white p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3 mb-6">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-3">Resumo do Pedido</h3>
                     <p className="text-gray-700"><strong>Produto:</strong> {editableProduct.name}</p>
@@ -447,7 +468,6 @@ const App: React.FC = () => {
                     <p className="text-gray-700"><strong>Frete para {formData.estado}:</strong> R$ {shippingCost.toFixed(2)}</p>
                     <p className="text-lg font-bold text-gray-800"><strong>Total:</strong> R$ {grandTotal.toFixed(2)}</p>
                 </div>
-
                 <div className="bg-blue-50 p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3">
                     <h3 className="text-lg font-semibold text-blue-800 border-b pb-2 mb-3">Instruções para Pagamento</h3>
                     <p className="text-gray-700">Para agilizar, realize o pagamento no valor total de <strong className="font-bold text-blue-900">R$ {grandTotal.toFixed(2)}</strong> via PIX e envie o comprovante para o nosso WhatsApp.</p>
@@ -460,15 +480,12 @@ const App: React.FC = () => {
                         <p className="text-sm text-gray-600 mt-4">Assista nosso <a href={adminSettings.orientationVideoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">vídeo de orientação</a> sobre como aplicar as etiquetas.</p>
                     )}
                 </div>
-                <button onClick={handleNewRegistration} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-300">
-                    Fazer Novo Pedido
-                </button>
+                <button onClick={handleNewRegistration} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition-all duration-300">Fazer Novo Pedido</button>
             </div>
         </div>
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-6 md:p-8 font-sans">
@@ -476,33 +493,23 @@ const App: React.FC = () => {
         {!isSubmitted ? (
           <>
             <header className="text-center mb-8">
-              <h1 className="text-4xl sm:text-5xl font-bold text-blue-800">
-                Print Foods®
-              </h1>
+              <h1 className="text-4xl sm:text-5xl font-bold text-blue-800">Print Foods®</h1>
               <p className="text-gray-600 mt-2">Olá, aluna do curso Minha Fábrica de Crepes! Faça seu pedido aqui.</p>
             </header>
             
             <section className="mb-8 p-6 bg-blue-50 rounded-lg shadow-inner border border-blue-200">
               <h2 className="text-xl font-semibold text-blue-800 mb-2">{editableProduct.name}</h2>
-              {editableProduct.description.split('\n').map((line, index) => (
-                  <p key={index} className="text-gray-700 mb-1">{line}</p>
-              ))}
-              <p className="text-lg font-bold text-blue-800 mt-4">
-                Valor por pacote com 100 unidades: <br />
-                <span className="text-gray-500 line-through mr-2">De R$ {OLD_PRICE.toFixed(2)}</span> 
-                por apenas R$ {editableProduct.price.toFixed(2)}
-              </p>
+              {editableProduct.description.split('\n').map((line, index) => (<p key={index} className="text-gray-700 mb-1">{line}</p>))}
+              <p className="text-lg font-bold text-blue-800 mt-4">Valor por pacote com 100 unidades: <br /><span className="text-gray-500 line-through mr-2">De R$ {OLD_PRICE.toFixed(2)}</span> por apenas R$ {editableProduct.price.toFixed(2)}</p>
             </section>
             
             <form id="formulario" onSubmit={handleSubmit} className="space-y-6 mt-4">
                 <div className="p-4 bg-gray-50 rounded-lg border">
                     <h3 className="block text-lg font-medium text-gray-800 mb-4">1. Personalize seu Pedido:</h3>
-                    
                     <div className="mb-6">
                         <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Etiquetas (mín. {MINIMUM_UNITS}, em múltiplos de {UNITS_PER_PACKAGE}):</label>
                         <input type="number" id="quantity" name="quantity" value={formData.quantity} onChange={handleQuantityChange} onBlur={handleQuantityChange} min={MINIMUM_UNITS} step={UNITS_PER_PACKAGE} required className="mt-1 block w-full max-w-xs px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                     </div>
-                    
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Texto de cada pacote de 100 etiquetas (Sabor):</label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -515,7 +522,6 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
                 <div className="p-4 bg-gray-50 rounded-lg border">
                     <h3 className="block text-lg font-medium text-gray-800 mb-4">2. Seus Dados e Entrega:</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -540,7 +546,6 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
                 <div className="p-6 bg-blue-100 rounded-lg shadow-md mt-6">
                     <h3 className="text-xl font-semibold text-blue-800 mb-4">Resumo do Pedido</h3>
                     <div className="space-y-2 text-gray-700">
@@ -550,72 +555,33 @@ const App: React.FC = () => {
                         <div className="flex justify-between text-lg font-bold text-blue-900"><span>Valor Total:</span> <span>R$ {grandTotal.toFixed(2)}</span></div>
                     </div>
                 </div>
-
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300">
-                    Finalizar Pedido e Ver Dados de Pagamento
-                </button>
+                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300">Finalizar Pedido e Ver Dados de Pagamento</button>
             </form>
           </>
         ) : null}
-
         {!isSubmitted && (
             <footer className="text-center mt-8">
-              <button
-                onClick={() => setShowAdminLoginModal(true)}
-                className="text-sm text-gray-400 hover:text-blue-600 transition-colors"
-              >
-                Acesso Administrativo
-              </button>
+              <button onClick={() => setShowAdminLoginModal(true)} className="text-sm text-gray-400 hover:text-blue-600 transition-colors">Acesso Administrativo</button>
             </footer>
         )}
       </div>
-
       {showAdminLoginModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Login Administrativo</h2>
             <form onSubmit={handleAdminLoginSubmit}>
               <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
-                  Usuário
-                </label>
-                <input
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  id="username"
-                  type="text"
-                  name="username"
-                  value={adminCredentials.username}
-                  onChange={handleAdminLoginChange}
-                />
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">Usuário</label>
+                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" type="text" name="username" value={adminCredentials.username} onChange={handleAdminLoginChange} />
               </div>
               <div className="mb-6">
-                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
-                  Senha
-                </label>
-                <input
-                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
-                  id="password"
-                  type="password"
-                  name="password"
-                  value={adminCredentials.password}
-                  onChange={handleAdminLoginChange}
-                />
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Senha</label>
+                <input className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" type="password" name="password" value={adminCredentials.password} onChange={handleAdminLoginChange} />
                 {adminLoginError && <p className="text-red-500 text-xs italic">{adminLoginError}</p>}
               </div>
               <div className="flex items-center justify-between">
-                <button
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                  type="submit"
-                >
-                  Entrar
-                </button>
-                <button
-                  className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800"
-                  type="button"
-                  onClick={() => setShowAdminLoginModal(false)}
-                >
-                  Cancelar
-                </button>
+                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="submit">Entrar</button>
+                <button className="inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800" type="button" onClick={() => setShowAdminLoginModal(false)}>Cancelar</button>
               </div>
             </form>
           </div>
