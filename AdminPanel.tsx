@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { AdminSettings, ProductDetails, EmailResult } from './types';
@@ -201,25 +202,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <span>Solução de Problemas do EmailJS (Clique para expandir)</span>
                                 </summary>
                                 <div className="mt-4 pt-4 border-t border-yellow-200 space-y-4 text-sm text-yellow-900">
-                                    <p>Se os e-mails não estão chegando ou o formulário mostra um erro, verifique os seguintes pontos no seu painel do <a href="https://dashboard.emailjs.com/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-yellow-700">EmailJS</a>:</p>
-                                    <ol className="list-decimal list-inside space-y-2">
+                                    <p>Se o formulário mostra um erro ao enviar (ex: "Erro retornado pelo EmailJS"), a mensagem de erro específica já indica o problema. Use a lista abaixo para resolver as causas mais comuns no seu painel do <a href="https://dashboard.emailjs.com/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-yellow-700">EmailJS</a>:</p>
+                                    <ol className="list-decimal list-inside space-y-3">
                                         <li>
-                                            <strong>Chaves e IDs Corretos:</strong> Verifique se o "Service ID", "Public Key" e os "Template IDs" (do admin e do cliente) estão copiados e colados exatamente como aparecem no EmailJS. Um erro de digitação é a causa mais comum.
+                                            <strong>Erro: "The Service ID is invalid..." ou "The Public Key is invalid..."</strong><br/>
+                                            Verifique se o "Service ID" e a "Public Key" copiados aqui correspondem exatamente aos da sua conta EmailJS em "Email Services" e "Account" &gt; "Security".
                                         </li>
                                         <li>
-                                            <strong>E-mail de Confirmação para o Cliente:</strong> No template do <strong>cliente</strong>, vá em "Settings" e certifique-se de que o campo "To email" está preenchido com a variável <code className="bg-yellow-200 p-1 rounded">{"{{user_recipient_email}}"}</code>. Isso garante que o e-mail seja enviado para o endereço que o cliente digitou no formulário.
+                                            <strong>Erro: "The Template ID is invalid..."</strong><br/>
+                                            Confira se os "Template IDs" (tanto do Admin quanto do Cliente) estão corretos. Você encontra o ID de cada template na lista "Email Templates".
                                         </li>
                                         <li>
-                                            <strong>E-mail de Notificação para o Admin:</strong> No template do <strong>admin</strong>, o campo "To email" deve ser o seu e-mail fixo (ex: atendimento@printfoods.com.br). Para poder responder diretamente ao cliente, use a variável <code className="bg-yellow-200 p-1 rounded">{"{{email}}"}</code> no campo "Reply-to".
+                                            <strong>Erro: "The user_recipient_email is required..." (E-mail do Cliente não chega)</strong><br/>
+                                            Esta é a causa mais comum para falha no envio ao cliente. No seu template do <strong>cliente</strong>, acesse "Settings" e garanta que o campo "To Email" está preenchido com a variável <code className="bg-yellow-200 p-1 rounded">{"{{user_recipient_email}}"}</code>. Não coloque um e-mail fixo aqui.
                                         </li>
                                         <li>
-                                            <strong>Variáveis no Template:</strong> Todas as variáveis <code className="bg-yellow-200 p-1 rounded">{"{{...}}"}</code> que você usa no corpo do e-mail devem corresponder exatamente às listadas no "Guia de Variáveis" abaixo. Se uma variável estiver errada, o EmailJS pode retornar um erro de "template params are corrupted".
+                                            <strong>Erro: "template params are corrupted"</strong><br/>
+                                            Isso significa que uma variável no seu template não existe ou está escrita errada. Verifique se todas as variáveis <code className="bg-yellow-200 p-1 rounded">{"{{...}}"}</code> no corpo do e-mail correspondem exatamente às do "Guia de Variáveis". Um erro comum é usar <code className="bg-yellow-200 p-1 rounded">{"{{nome_cliente}}"}</code> em vez de <code className="bg-yellow-200 p-1 rounded">{"{{nome}}"}</code>.
                                         </li>
                                         <li>
-                                            <strong>Campos Opcionais:</strong> Se você usa variáveis que podem estar vazias (como <code className="bg-yellow-200 p-1 rounded">{"{{company_cnpj}}"}</code>), é <strong>essencial</strong> envolvê-las com uma condição <code className="bg-yellow-200 p-1 rounded">{"{{#if company_cnpj}} ... {{/if}}"}</code> no HTML do template. Isso evita erros.
+                                            <strong>Dica para Responder ao Cliente (E-mail do Admin):</strong><br/>
+                                            No seu template do <strong>admin</strong>, na aba "Settings", use a variável <code className="bg-yellow-200 p-1 rounded">{"{{email}}"}</code> no campo "Reply-To". Isso fará com que o botão "Responder" do seu e-mail já preencha o destinatário com o e-mail do cliente.
                                         </li>
                                         <li>
-                                            <strong>Cota de E-mails:</strong> Verifique em seu painel do EmailJS se você não excedeu sua cota mensal de envios.
+                                            <strong>Cota de E-mails Excedida:</strong><br/>
+                                            Acesse sua conta EmailJS e verifique no painel principal se você não ultrapassou o limite mensal de envios do seu plano (o plano gratuito tem 200 envios/mês).
                                         </li>
                                     </ol>
                                 </div>

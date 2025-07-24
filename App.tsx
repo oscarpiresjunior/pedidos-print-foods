@@ -32,30 +32,37 @@ const sendEmailViaEmailJS = async (
   publicKey: string
 ): Promise<EmailResult> => {
   if (!serviceId || !templateId || !publicKey) {
-    const errorMessage = "Configurações do EmailJS (Service ID, Template ID, ou Public Key) incompletas.";
+    const errorMessage = "Configurações do EmailJS (Service ID, Template ID ou Public Key) estão incompletas.";
     console.warn(errorMessage);
     return { success: false, error: errorMessage };
   }
   if (typeof (window as any).emailjs === 'undefined') {
-    const errorMessage = "SDK do EmailJS não carregado.";
+    const errorMessage = "SDK do EmailJS não foi carregado. Verifique a conexão com a internet.";
     console.error(errorMessage);
     return { success: false, error: errorMessage };
   }
+
   try {
     await (window as any).emailjs.send(serviceId, templateId, templateParams, publicKey);
     return { success: true };
-  } catch (error) {
-    console.error("EmailJS send failed:", error);
-    let errorText = 'Ocorreu um erro desconhecido.';
-    // EmailJS errors are often objects with a `text` property, which is more descriptive.
-    if (typeof error === 'object' && error !== null && 'text' in error) {
-        errorText = (error as { text: string }).text;
-    } else if (error instanceof Error) {
-        errorText = error.message;
+  } catch (err) {
+    console.error("Falha no envio via EmailJS:", err);
+    // O objeto de erro do EmailJS geralmente contém a propriedade 'text' com a mensagem de erro específica.
+    // Dar prioridade a essa mensagem ajuda muito na depuração.
+    // Ex: "The user_recipient_email is required", "Invalid Template ID".
+    let detailedError = "Ocorreu um erro desconhecido.";
+    if (typeof err === 'object' && err !== null && 'text' in err) {
+      detailedError = String((err as { text: string }).text);
+    } else if (err instanceof Error) {
+      detailedError = err.message;
     } else {
-        errorText = JSON.stringify(error);
+      try {
+        detailedError = JSON.stringify(err);
+      } catch {
+        detailedError = String(err);
+      }
     }
-    return { success: false, error: `Falha no envio: ${errorText}` };
+    return { success: false, error: `Erro retornado pelo EmailJS: "${detailedError}"` };
   }
 };
 
