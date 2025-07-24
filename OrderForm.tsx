@@ -11,13 +11,14 @@ interface OrderFormProps {
   logoBase64?: string;
 }
 
-const MINIMUM_UNITS = 500;
 const UNITS_PER_PACKAGE = 100;
 const OLD_PRICE = 31.52;
 const brazilianStates = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 
   'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
+const quantityOptions = Array.from({ length: (2000 - 500) / 100 + 1 }, (_, i) => 500 + i * 100);
+
 
 const OrderForm: React.FC<OrderFormProps> = ({
   formData, setFormData, editableProduct, orderTotals,
@@ -57,18 +58,11 @@ const OrderForm: React.FC<OrderFormProps> = ({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newQuantity = parseInt(e.target.value, 10);
-    if (e.type === 'blur') {
-      if (isNaN(newQuantity) || newQuantity < MINIMUM_UNITS) newQuantity = MINIMUM_UNITS;
-      newQuantity = Math.round(newQuantity / UNITS_PER_PACKAGE) * UNITS_PER_PACKAGE;
-      if (newQuantity < MINIMUM_UNITS) newQuantity = MINIMUM_UNITS;
-    }
-    if (isNaN(newQuantity)) newQuantity = MINIMUM_UNITS;
-    if (newQuantity > 5000) newQuantity = 5000;
-
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newQuantity = parseInt(e.target.value, 10);
+    
     setFormData(prev => {
-        const numPackages = Math.ceil(newQuantity / UNITS_PER_PACKAGE);
+        const numPackages = newQuantity / UNITS_PER_PACKAGE;
         const newSabores = Array.from({ length: numPackages }, (_, i) => prev.sabores[i] || '');
         return { ...prev, quantity: newQuantity, sabores: newSabores };
     });
@@ -98,8 +92,19 @@ const OrderForm: React.FC<OrderFormProps> = ({
             <div className="p-4 bg-gray-50 rounded-lg border">
               <h3 className="block text-lg font-medium text-gray-800 mb-4">1. Personalize seu Pedido:</h3>
               <div className="mb-6">
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Etiquetas (mín. {MINIMUM_UNITS}, em múltiplos de {UNITS_PER_PACKAGE}):</label>
-                  <input type="number" id="quantity" name="quantity" value={formData.quantity} onChange={handleQuantityChange} onBlur={handleQuantityChange} min={MINIMUM_UNITS} step={UNITS_PER_PACKAGE} required className="mt-1 block w-full max-w-xs px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Etiquetas:</label>
+                  <select
+                    id="quantity"
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleQuantityChange}
+                    required
+                    className="mt-1 block w-full max-w-xs px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {quantityOptions.map(q => (
+                      <option key={q} value={q}>{q} unidades</option>
+                    ))}
+                  </select>
               </div>
               <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Texto de cada pacote de 100 etiquetas (Sabor):</label>
