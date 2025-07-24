@@ -37,7 +37,9 @@ const App: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     nome: '', whatsapp: '', email: '',
     cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
-    quantity: 500, sabores: Array(500 / 100).fill(''),
+    model: '',
+    quantity: 500,
+    flavorDetails: [],
   });
 
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
@@ -57,6 +59,10 @@ const App: React.FC = () => {
     cnpj: '',
     logoBase64: '',
     pixQrBase64: '',
+    modelImageRect22x10: '',
+    modelImageRect30x14: '',
+    modelImageQuadrada20x20: '',
+    modelOval17x25: '',
   });
 
   useEffect(() => {
@@ -104,16 +110,16 @@ const App: React.FC = () => {
     }
 
     const sendNotifications = async () => {
-      const { quantity, sabores, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado } = formData;
+      const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
       const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
 
-      const numPackages = quantity / 100;
-      const saboresList = sabores.slice(0, numPackages).map((s, i) => `  - Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
+      const saboresList = flavorDetails.map(f => `  - ${f.quantity}x de ${f.name || 'Sabor não definido'}`).join('\n');
       const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
 
       const adminMessage = `*Novo Pedido Print Foods*
 *Cliente:* ${nome}
 *Contato:* ${whatsapp}
+*Modelo:* ${model}
 *Pedido:* ${quantity}x ${editableProduct.name}
 *Sabores:*
 ${saboresList}
@@ -144,7 +150,7 @@ ${saboresList}
       try {
         if(whatsapp && callMeBotApiKey){
             const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
-            const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${editableProduct.name}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
+            const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${editableProduct.name}\n- *Modelo:* ${model}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
             await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
         }
       } catch (clientError) {
@@ -162,7 +168,9 @@ ${saboresList}
     setFormData({
         nome: '', whatsapp: '', email: '',
         cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
-        quantity: 500, sabores: Array(5).fill(''),
+        model: '',
+        quantity: 500, 
+        flavorDetails: [],
     });
     setIsSubmitted(false);
     setSubmissionStatus('idle');
@@ -239,7 +247,7 @@ ${saboresList}
         orderTotals={{ subtotal, shippingCost, grandTotal }}
         handleSubmit={handleSubmit}
         submissionStatus={submissionStatus}
-        logoBase64={adminSettings.logoBase64}
+        adminSettings={adminSettings}
       />
       <footer className="text-center mt-8">
         <button onClick={() => setShowAdminLoginModal(true)} className="text-sm text-gray-400 hover:text-blue-600 transition-colors">

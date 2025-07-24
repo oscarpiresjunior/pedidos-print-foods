@@ -9,8 +9,9 @@ export interface FormData {
   bairro: string;
   cidade: string;
   estado: string;
+  model: string;
   quantity: number;
-  sabores: string[];
+  flavorDetails: { name: string; quantity: number }[];
 }
 
 export interface ProductDetails {
@@ -29,6 +30,10 @@ export interface AdminSettings {
   cnpj: string;
   logoBase64: string;
   pixQrBase64: string;
+  modelImageRect22x10: string;
+  modelImageRect30x14: string;
+  modelImageQuadrada20x20: string;
+  modelOval17x25: string;
 }
 
 export interface OrderTotals {

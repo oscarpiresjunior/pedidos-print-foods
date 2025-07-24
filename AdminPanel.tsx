@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AdminSettings, ProductDetails } from './types';
 
@@ -10,6 +9,13 @@ interface AdminPanelProps {
     onTestWhatsapp: () => Promise<{ success: boolean; error?: string }>;
     onExitAdmin: () => void;
 }
+
+const modelsToManage = [
+  { key: 'modelImageRect22x10', label: 'Retangular 22x10mm' },
+  { key: 'modelImageRect30x14', label: 'Retangular 30x14mm' },
+  { key: 'modelImageQuadrada20x20', label: 'Quadrada 20x20mm' },
+  { key: 'modelOval17x25', label: 'Oval 17x25mm' }
+];
 
 const AdminPanel: React.FC<AdminPanelProps> = ({
     adminSettings, setAdminSettings, editableProduct, setEditableProduct, onTestWhatsapp, onExitAdmin
@@ -25,7 +31,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         setEditableProduct(prev => ({ ...prev, [field]: field === 'price' ? Number(value) : value }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'logoBase64' | 'pixQrBase64') => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof AdminSettings) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
@@ -56,7 +62,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="space-y-8">
                     {/* Gerenciamento de Mídia */}
                     <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
-                        <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Gerenciamento de Mídia</h3>
+                        <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Gerenciamento de Mídia Principal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
                             <div>
                                 <label htmlFor="logoUpload" className="block text-sm font-medium text-gray-700">Logo da Empresa</label>
@@ -68,6 +74,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <input type="file" id="pixQrUpload" accept="image/*" onChange={(e) => handleFileChange(e, 'pixQrBase64')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
                                 {adminSettings.pixQrBase64 && <img src={adminSettings.pixQrBase64} alt="PIX QR Code Preview" className="mt-2 h-16 w-16 border rounded p-1"/>}
                             </div>
+                        </div>
+                    </div>
+                    
+                    {/* Gerenciamento de Mídia dos Modelos */}
+                    <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
+                        <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Imagens dos Modelos de Etiqueta</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                           {modelsToManage.map(model => (
+                             <div key={model.key}>
+                                <label htmlFor={model.key} className="block text-sm font-medium text-gray-700">{model.label}</label>
+                                <input type="file" id={model.key} accept="image/*" onChange={(e) => handleFileChange(e, model.key as keyof AdminSettings)} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
+                                {adminSettings[model.key as keyof AdminSettings] && <img src={adminSettings[model.key as keyof AdminSettings] as string} alt={`${model.label} Preview`} className="mt-2 h-16 w-auto border rounded p-1"/>}
+                             </div>
+                           ))}
                         </div>
                     </div>
 
