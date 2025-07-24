@@ -11,10 +11,10 @@ interface AdminPanelProps {
 }
 
 const modelsToManage = [
-  { key: 'modelImageRect22x10', label: 'Retangular 22x10mm' },
-  { key: 'modelImageRect30x14', label: 'Retangular 30x14mm' },
-  { key: 'modelImageQuadrada20x20', label: 'Quadrada 20x20mm' },
-  { key: 'modelOval17x25', label: 'Oval 17x25mm' }
+  { key: 'modelImageRect22x10Base64', label: 'Retangular 22x10mm' },
+  { key: 'modelImageRect30x14Base64', label: 'Retangular 30x14mm' },
+  { key: 'modelImageQuadrada20x20Base64', label: 'Quadrada 20x20mm' },
+  { key: 'modelImageOval17x25Base64', label: 'Oval 17x25mm' }
 ];
 
 const AdminPanel: React.FC<AdminPanelProps> = ({

@@ -59,12 +59,13 @@ const App: React.FC = () => {
     cnpj: '',
     logoBase64: '',
     pixQrBase64: '',
-    modelImageRect22x10: '',
-    modelImageRect30x14: '',
-    modelImageQuadrada20x20: '',
-    modelOval17x25: '',
+    modelImageRect22x10Base64: '',
+    modelImageRect30x14Base64: '',
+    modelImageQuadrada20x20Base64: '',
+    modelImageOval17x25Base64: '',
     jsonBinApiKey: '',
     jsonBinBinId: '',
+    imgbbApiKey: '',
   });
 
   useEffect(() => {
@@ -99,6 +100,10 @@ const App: React.FC = () => {
           // Mantém as chaves locais caso não venham da nuvem, garantindo que não sejam perdidas.
           cloudSettings.jsonBinBinId = binId;
           cloudSettings.jsonBinApiKey = apiKey;
+          // Mantém a chave do imgbb se não vier da nuvem, para não perdê-la.
+          if (!cloudSettings.imgbbApiKey && localSettings.imgbbApiKey) {
+            cloudSettings.imgbbApiKey = localSettings.imgbbApiKey;
+          }
 
           console.log("Configurações carregadas da nuvem com sucesso.");
           setAdminSettings(prev => ({ ...prev, ...cloudSettings }));
@@ -116,7 +121,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Este efeito persiste qualquer mudança no localStorage.
-    // Essencial para salvar as chaves do JSONBin quando inseridas no painel.
+    // Essencial para salvar as chaves quando inseridas no painel.
     try {
       localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
     } catch (error) {
