@@ -21,23 +21,14 @@ export interface ProductDetails {
 }
 
 export interface AdminSettings {
-  adminEmail: string;
   adminWhatsapp: string;
+  adminWhatsapp2: string;
   orientationVideoUrl: string;
   callMeBotApiKey: string;
-  emailJsServiceId: string;
-  emailJsTemplateIdAdmin: string;
-  emailJsTemplateIdUser: string;
-  emailJsPublicKey: string;
   pixKey: string;
   cnpj: string;
   logoBase64: string;
   pixQrBase64: string;
-}
-
-export interface EmailResult {
-  success: boolean;
-  error?: any;
 }
 
 export interface OrderTotals {

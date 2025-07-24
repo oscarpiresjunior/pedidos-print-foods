@@ -1,16 +1,15 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { AdminSettings, FormData, ProductDetails, EmailResult } from './types';
+import { AdminSettings, FormData, ProductDetails } from './types';
 import OrderForm from './OrderForm';
 import SuccessPage from './SuccessPage';
 import AdminPanel from './AdminPanel';
 import { ADMIN_USERNAME, ADMIN_PASSWORD } from './config';
 
-// Funções utilitárias movidas para fora do componente para clareza
+// Função utilitária para enviar WhatsApp via CallMeBot
 const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: string, apiKey: string): Promise<void> => {
   if (!apiKey || !adminPhoneNumber) {
-    console.warn("CallMeBot API Key ou número do admin não configurado. WhatsApp não enviado.");
-    return;
+    throw new Error("CallMeBot API Key ou número do admin não configurado.");
   }
   const phoneNumberOnlyDigits = adminPhoneNumber.replace(/\D/g, '');
   const encodedMessage = encodeURIComponent(message);
@@ -18,51 +17,19 @@ const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: strin
 
   try {
     const response = await fetch(url, { method: 'GET' });
-    if (response.ok) console.log("Mensagem do WhatsApp enviada via CallMeBot com sucesso!");
-    else console.error("Erro ao enviar mensagem via CallMeBot:", response.status, await response.text());
+    if (response.ok) {
+      console.log(`Mensagem do WhatsApp enviada para ${adminPhoneNumber} com sucesso!`);
+    } else {
+      const errorText = await response.text();
+      console.error("Erro ao enviar mensagem via CallMeBot:", response.status, errorText);
+      throw new Error(`Falha ao enviar notificação para ${adminPhoneNumber}. Resposta do serviço: ${errorText}`);
+    }
   } catch (error) {
     console.error("Erro de rede ao tentar enviar mensagem via CallMeBot:", error);
-  }
-};
-
-const sendEmailViaEmailJS = async (
-  serviceId: string,
-  templateId: string,
-  templateParams: Record<string, unknown>,
-  publicKey: string
-): Promise<EmailResult> => {
-  if (!serviceId || !templateId || !publicKey) {
-    const errorMessage = "Configurações do EmailJS (Service ID, Template ID ou Public Key) estão incompletas.";
-    console.warn(errorMessage);
-    return { success: false, error: errorMessage };
-  }
-  if (typeof (window as any).emailjs === 'undefined') {
-    const errorMessage = "SDK do EmailJS não foi carregado. Verifique a conexão com a internet.";
-    console.error(errorMessage);
-    return { success: false, error: errorMessage };
-  }
-
-  try {
-    await (window as any).emailjs.send(serviceId, templateId, templateParams, publicKey);
-    return { success: true };
-  } catch (err) {
-    console.error("Falha no envio via EmailJS:", err);
-    // O objeto de erro do EmailJS geralmente contém a propriedade 'text' com a mensagem de erro específica.
-    // Dar prioridade a essa mensagem ajuda muito na depuração.
-    // Ex: "The user_recipient_email is required", "Invalid Template ID".
-    let detailedError = "Ocorreu um erro desconhecido.";
-    if (typeof err === 'object' && err !== null && 'text' in err) {
-      detailedError = String((err as { text: string }).text);
-    } else if (err instanceof Error) {
-      detailedError = err.message;
-    } else {
-      try {
-        detailedError = JSON.stringify(err);
-      } catch {
-        detailedError = String(err);
-      }
+    if (error instanceof Error && error.message.startsWith('Falha ao enviar')) {
+      throw error; // Re-lança o erro específico
     }
-    return { success: false, error: `Erro retornado pelo EmailJS: "${detailedError}"` };
+    throw new Error(`Erro de rede ao enviar notificação para ${adminPhoneNumber}.`);
   }
 };
 
@@ -90,14 +57,10 @@ const App: React.FC = () => {
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
-    adminEmail: 'atendimento@printfoods.com.br',
     adminWhatsapp: '5522997146538',
+    adminWhatsapp2: '',
     orientationVideoUrl: '',
     callMeBotApiKey: '',
-    emailJsServiceId: '',
-    emailJsTemplateIdAdmin: '',
-    emailJsTemplateIdUser: '',
-    emailJsPublicKey: '',
     pixKey: 'beaf7a1f-df15-4695-aa30-593c46629de7',
     cnpj: '',
     logoBase64: '',
@@ -137,54 +100,55 @@ const App: React.FC = () => {
     setSubmissionStatus('submitting');
     setSubmissionError(null);
 
-    const { quantity, sabores, nome, whatsapp, email, ...address } = formData;
-    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey, emailJsTemplateIdUser, callMeBotApiKey, adminWhatsapp, orientationVideoUrl, adminEmail, cnpj, pixKey } = adminSettings;
+    const { quantity, sabores, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado } = formData;
+    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
 
     const numPackages = quantity / 100;
-    const saboresList = sabores.slice(0, numPackages).map((s, i) => `Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
-    const fullAddress = `${address.logradouro}, ${address.numero} - ${address.bairro}, ${address.cidade} - ${address.estado}, CEP: ${address.cep}`;
-    const pixToDisplay = pixKey || cnpj;
+    const saboresList = sabores.slice(0, numPackages).map((s, i) => `  - Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
+    const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
+
+    const adminMessage = `*Novo Pedido Print Foods*
+*Cliente:* ${nome}
+*Contato:* ${whatsapp}
+*Pedido:* ${quantity}x ${editableProduct.name}
+*Sabores:*
+${saboresList}
+*Total:* R$ ${grandTotal.toFixed(2)}
+*Endereço:* ${fullAddress}`;
 
     try {
-      // Objeto base com parâmetros para o template, garantindo que todos os valores sejam strings.
-      // Isso evita o erro de "variáveis corrompidas" no EmailJS ao não passar tipos como 'number' ou 'array'.
-      const baseTemplateParams = {
-        nome: formData.nome,
-        whatsapp: formData.whatsapp,
-        email: formData.email,
-        full_address: fullAddress,
-        product_name: editableProduct.name,
-        quantity_text: `${quantity} unidades (${numPackages} pacotes)`,
-        sabores_list: saboresList,
-        subtotal: subtotal.toFixed(2),
-        shipping_cost: shippingCost.toFixed(2),
-        grand_total: grandTotal.toFixed(2),
-      };
-
-      // Envia e-mail para o administrador
-      const adminParams = { ...baseTemplateParams, reply_to: email };
-      const adminResult = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, adminParams, emailJsPublicKey);
-      if (!adminResult.success) throw new Error(`Falha ao notificar admin. Detalhe: ${adminResult.error}`);
-
-      // Envia e-mail de confirmação para o usuário
-      const userParams = {
-        ...baseTemplateParams,
-        user_recipient_email: email,
-        orientation_video_url: orientationVideoUrl,
-        admin_whatsapp_contact: adminWhatsapp,
-        admin_reply_to_email: adminEmail,
-        company_cnpj: cnpj,
-        pix_key_info: pixToDisplay,
-      };
-      const userResult = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdUser, userParams, emailJsPublicKey);
-      if (!userResult.success) throw new Error(`Falha ao enviar confirmação ao cliente. Detalhe: ${userResult.error}`);
-
-      const whatsappMessage = `Novo Pedido: ${quantity}x ${editableProduct.name} por ${nome}. Total: R$${grandTotal.toFixed(2)}. Contato: ${whatsapp}`;
-      if (callMeBotApiKey && adminWhatsapp) {
-        await sendWhatsAppViaCallMeBot(whatsappMessage, adminWhatsapp, callMeBotApiKey);
+      if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
+        throw new Error("Notificação por WhatsApp não configurada. Administrador, verifique a chave da API do CallMeBot e os números de WhatsApp no painel.");
+      }
+      
+      const adminPromises = [];
+      if (adminWhatsapp) {
+        adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
+      }
+      if (adminWhatsapp2) {
+        adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
       }
 
+      if (adminPromises.length === 0) {
+           throw new Error("Nenhum número de WhatsApp para notificação foi configurado pelo administrador.");
+      }
+      
+      await Promise.all(adminPromises);
+
+      // Envia confirmação para o cliente
+      try {
+        if(whatsapp && callMeBotApiKey){
+            const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
+            const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${editableProduct.name}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
+            await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
+        }
+      } catch (clientError) {
+        // Loga o erro mas não impede o fluxo. O importante é o admin receber.
+        console.error("Falha ao enviar confirmação para o cliente via WhatsApp:", clientError);
+      }
+      
       setIsSubmitted(true);
+
     } catch (error) {
       const msg = (error instanceof Error) ? error.message : 'Ocorreu um erro desconhecido.';
       setSubmissionError(msg);
@@ -215,23 +179,28 @@ const App: React.FC = () => {
     }
   };
 
-  const handleTestEmail = async () => {
-    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey } = adminSettings;
-    // Usar um conjunto completo de dados de teste para garantir a compatibilidade total com o template do admin.
-    const testParams = {
-        nome: "Cliente de Teste",
-        whatsapp: "(00) 99999-8888",
-        email: "cliente.teste@exemplo.com",
-        full_address: "Rua do Teste, 123 - Bairro Modelo, Cidade Fictícia - UF, CEP: 12345-678",
-        product_name: "Produto de Demonstração",
-        quantity_text: "500 unidades (5 pacotes)",
-        sabores_list: "Sabor 1: Chocolate\nSabor 2: Baunilha\nSabor 3: Morango\nSabor 4: Limão\nSabor 5: Abacaxi",
-        subtotal: "126.05",
-        shipping_cost: "25.00",
-        grand_total: "151.05",
-        reply_to: "cliente.teste@exemplo.com",
-    };
-    return await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, testParams, emailJsPublicKey);
+  const handleTestWhatsapp = async (): Promise<{ success: boolean; error?: string }> => {
+    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2 } = adminSettings;
+    const testMessage = "Esta é uma mensagem de teste do sistema de pedidos da Print Foods.";
+    
+    if (!callMeBotApiKey) {
+        return { success: false, error: "API Key do CallMeBot não configurada." };
+    }
+    if (!adminWhatsapp && !adminWhatsapp2) {
+        return { success: false, error: "Nenhum número de WhatsApp do administrador configurado." };
+    }
+
+    try {
+        const promises = [];
+        if (adminWhatsapp) promises.push(sendWhatsAppViaCallMeBot(testMessage, adminWhatsapp, callMeBotApiKey));
+        if (adminWhatsapp2) promises.push(sendWhatsAppViaCallMeBot(testMessage, adminWhatsapp2, callMeBotApiKey));
+        
+        await Promise.all(promises);
+        return { success: true };
+    } catch (error) {
+        const msg = (error instanceof Error) ? error.message : 'Ocorreu um erro desconhecido.';
+        return { success: false, error: msg };
+    }
   };
 
   // Render Logic
@@ -242,7 +211,7 @@ const App: React.FC = () => {
         setAdminSettings={setAdminSettings}
         editableProduct={editableProduct}
         setEditableProduct={setEditableProduct}
-        onTestEmail={handleTestEmail}
+        onTestWhatsapp={handleTestWhatsapp}
         onExitAdmin={() => setIsAdminView(false)}
       />
     );

@@ -34,7 +34,7 @@ const SuccessPage: React.FC<SuccessPageProps> = ({
          {adminSettings.logoBase64 && <img src={adminSettings.logoBase64} alt="Logo da Empresa" className="mx-auto h-20 w-auto mb-6"/>}
          <div className="text-center p-4 sm:p-8 bg-green-50 rounded-lg shadow-lg border-2 border-green-200">
               <h2 className="text-2xl sm:text-3xl font-bold text-green-800 mb-4">Pedido Enviado com Sucesso!</h2>
-              <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e um e-mail com os detalhes foi enviado para {formData.email}.</p>
+              <p className="text-gray-700 mb-6">Obrigado, {formData.nome}! Recebemos seu pedido e <strong className="font-semibold">enviamos uma mensagem de confirmação para seu WhatsApp</strong> ({formData.whatsapp}). Em breve nossa equipe entrará em contato para combinar o pagamento.</p>
               
               <div className="bg-white p-4 sm:p-6 rounded-md shadow-inner text-left space-y-3 mb-6">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2 mb-3">Resumo do Pedido</h3>
