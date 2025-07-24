@@ -193,6 +193,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <input type="text" name="emailJsTemplateIdAdmin" placeholder="Template ID (Admin)" value={adminSettings.emailJsTemplateIdAdmin} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             <input type="text" name="emailJsTemplateIdUser" placeholder="Template ID (Cliente)" value={adminSettings.emailJsTemplateIdUser} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                         </div>
+
+                        <div className="mt-8 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                            <details>
+                                <summary className="font-semibold text-yellow-800 cursor-pointer hover:text-yellow-600 list-none flex items-center gap-2 select-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                    <span>Solução de Problemas do EmailJS (Clique para expandir)</span>
+                                </summary>
+                                <div className="mt-4 pt-4 border-t border-yellow-200 space-y-4 text-sm text-yellow-900">
+                                    <p>Se os e-mails não estão chegando ou o formulário mostra um erro, verifique os seguintes pontos no seu painel do <a href="https://dashboard.emailjs.com/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-yellow-700">EmailJS</a>:</p>
+                                    <ol className="list-decimal list-inside space-y-2">
+                                        <li>
+                                            <strong>Chaves e IDs Corretos:</strong> Verifique se o "Service ID", "Public Key" e os "Template IDs" (do admin e do cliente) estão copiados e colados exatamente como aparecem no EmailJS. Um erro de digitação é a causa mais comum.
+                                        </li>
+                                        <li>
+                                            <strong>E-mail de Confirmação para o Cliente:</strong> No template do <strong>cliente</strong>, vá em "Settings" e certifique-se de que o campo "To email" está preenchido com a variável <code className="bg-yellow-200 p-1 rounded">{"{{user_recipient_email}}"}</code>. Isso garante que o e-mail seja enviado para o endereço que o cliente digitou no formulário.
+                                        </li>
+                                        <li>
+                                            <strong>E-mail de Notificação para o Admin:</strong> No template do <strong>admin</strong>, o campo "To email" deve ser o seu e-mail fixo (ex: atendimento@printfoods.com.br). Para poder responder diretamente ao cliente, use a variável <code className="bg-yellow-200 p-1 rounded">{"{{email}}"}</code> no campo "Reply-to".
+                                        </li>
+                                        <li>
+                                            <strong>Variáveis no Template:</strong> Todas as variáveis <code className="bg-yellow-200 p-1 rounded">{"{{...}}"}</code> que você usa no corpo do e-mail devem corresponder exatamente às listadas no "Guia de Variáveis" abaixo. Se uma variável estiver errada, o EmailJS pode retornar um erro de "template params are corrupted".
+                                        </li>
+                                        <li>
+                                            <strong>Campos Opcionais:</strong> Se você usa variáveis que podem estar vazias (como <code className="bg-yellow-200 p-1 rounded">{"{{company_cnpj}}"}</code>), é <strong>essencial</strong> envolvê-las com uma condição <code className="bg-yellow-200 p-1 rounded">{"{{#if company_cnpj}} ... {{/if}}"}</code> no HTML do template. Isso evita erros.
+                                        </li>
+                                        <li>
+                                            <strong>Cota de E-mails:</strong> Verifique em seu painel do EmailJS se você não excedeu sua cota mensal de envios.
+                                        </li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
                         
                         <div className="mt-8 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                             <details>

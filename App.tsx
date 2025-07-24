@@ -45,7 +45,16 @@ const sendEmailViaEmailJS = async (
     await (window as any).emailjs.send(serviceId, templateId, templateParams, publicKey);
     return { success: true };
   } catch (error) {
-    const errorText = (error instanceof Error) ? error.message : JSON.stringify(error);
+    console.error("EmailJS send failed:", error);
+    let errorText = 'Ocorreu um erro desconhecido.';
+    // EmailJS errors are often objects with a `text` property, which is more descriptive.
+    if (typeof error === 'object' && error !== null && 'text' in error) {
+        errorText = (error as { text: string }).text;
+    } else if (error instanceof Error) {
+        errorText = error.message;
+    } else {
+        errorText = JSON.stringify(error);
+    }
     return { success: false, error: `Falha no envio: ${errorText}` };
   }
 };
@@ -130,22 +139,29 @@ const App: React.FC = () => {
     const pixToDisplay = pixKey || cnpj;
 
     try {
-      const adminParams = {
-        ...formData,
+      // Objeto base com parâmetros para o template, garantindo que todos os valores sejam strings.
+      // Isso evita o erro de "variáveis corrompidas" no EmailJS ao não passar tipos como 'number' ou 'array'.
+      const baseTemplateParams = {
+        nome: formData.nome,
+        whatsapp: formData.whatsapp,
+        email: formData.email,
+        full_address: fullAddress,
         product_name: editableProduct.name,
         quantity_text: `${quantity} unidades (${numPackages} pacotes)`,
         sabores_list: saboresList,
-        full_address: fullAddress,
         subtotal: subtotal.toFixed(2),
         shipping_cost: shippingCost.toFixed(2),
         grand_total: grandTotal.toFixed(2),
-        reply_to: email,
       };
+
+      // Envia e-mail para o administrador
+      const adminParams = { ...baseTemplateParams, reply_to: email };
       const adminResult = await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, adminParams, emailJsPublicKey);
       if (!adminResult.success) throw new Error(`Falha ao notificar admin. Detalhe: ${adminResult.error}`);
 
+      // Envia e-mail de confirmação para o usuário
       const userParams = {
-        ...adminParams,
+        ...baseTemplateParams,
         user_recipient_email: email,
         orientation_video_url: orientationVideoUrl,
         admin_whatsapp_contact: adminWhatsapp,
@@ -193,12 +209,20 @@ const App: React.FC = () => {
   };
 
   const handleTestEmail = async () => {
-    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey, adminEmail } = adminSettings;
+    const { emailJsServiceId, emailJsTemplateIdAdmin, emailJsPublicKey } = adminSettings;
+    // Usar um conjunto completo de dados de teste para garantir a compatibilidade total com o template do admin.
     const testParams = {
-        product_name: "E-mail de Teste",
-        sabores_list: "Teste de configuração do EmailJS.",
-        user_name: "Sistema Print Foods",
-        reply_to: adminEmail,
+        nome: "Cliente de Teste",
+        whatsapp: "(00) 99999-8888",
+        email: "cliente.teste@exemplo.com",
+        full_address: "Rua do Teste, 123 - Bairro Modelo, Cidade Fictícia - UF, CEP: 12345-678",
+        product_name: "Produto de Demonstração",
+        quantity_text: "500 unidades (5 pacotes)",
+        sabores_list: "Sabor 1: Chocolate\nSabor 2: Baunilha\nSabor 3: Morango\nSabor 4: Limão\nSabor 5: Abacaxi",
+        subtotal: "126.05",
+        shipping_cost: "25.00",
+        grand_total: "151.05",
+        reply_to: "cliente.teste@exemplo.com",
     };
     return await sendEmailViaEmailJS(emailJsServiceId, emailJsTemplateIdAdmin, testParams, emailJsPublicKey);
   };
