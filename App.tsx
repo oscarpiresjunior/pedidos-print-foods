@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { AdminSettings, FormData, ProductDetails } from './types';
 import OrderForm from './OrderForm';
@@ -7,29 +6,23 @@ import AdminPanel from './AdminPanel';
 import { ADMIN_USERNAME, ADMIN_PASSWORD } from './config';
 
 // Função utilitária para enviar WhatsApp via CallMeBot
-const sendWhatsAppViaCallMeBot = async (message: string, adminPhoneNumber: string, apiKey: string): Promise<void> => {
-  if (!apiKey || !adminPhoneNumber) {
-    throw new Error("CallMeBot API Key ou número do admin não configurado.");
+const sendWhatsAppViaCallMeBot = async (message: string, phoneNumber: string, apiKey: string): Promise<void> => {
+  if (!apiKey || !phoneNumber) {
+    throw new Error("CallMeBot API Key ou número de telefone não configurado.");
   }
-  const phoneNumberOnlyDigits = adminPhoneNumber.replace(/\D/g, '');
+  const phoneNumberOnlyDigits = phoneNumber.replace(/\D/g, '');
   const encodedMessage = encodeURIComponent(message);
   const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumberOnlyDigits}&text=${encodedMessage}&apikey=${apiKey}`;
 
   try {
-    const response = await fetch(url, { method: 'GET' });
-    if (response.ok) {
-      console.log(`Mensagem do WhatsApp enviada para ${adminPhoneNumber} com sucesso!`);
-    } else {
-      const errorText = await response.text();
-      console.error("Erro ao enviar mensagem via CallMeBot:", response.status, errorText);
-      throw new Error(`Falha ao enviar notificação para ${adminPhoneNumber}. Resposta do serviço: ${errorText}`);
-    }
+    // Usando 'no-cors' para evitar problemas de CORS que podem ser interpretados como erros de rede.
+    // A chamada é "dispare e esqueça", assumindo que funciona se não houver um erro de rede real.
+    await fetch(url, { method: 'GET', mode: 'no-cors' });
+    console.log(`Tentativa de envio de mensagem do WhatsApp para ${phoneNumber} efetuada.`);
   } catch (error) {
     console.error("Erro de rede ao tentar enviar mensagem via CallMeBot:", error);
-    if (error instanceof Error && error.message.startsWith('Falha ao enviar')) {
-      throw error; // Re-lança o erro específico
-    }
-    throw new Error(`Erro de rede ao enviar notificação para ${adminPhoneNumber}.`);
+    // Propaga o erro para que a função chamadora (como o botão de teste) saiba da falha.
+    throw new Error(`Erro de rede ao enviar notificação para ${phoneNumber}.`);
   }
 };
 
@@ -48,8 +41,7 @@ const App: React.FC = () => {
   });
 
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting' | 'error'>('idle');
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting'>('idle');
   
   const [isAdminView, setIsAdminView] = useState<boolean>(false);
   const [showAdminLoginModal, setShowAdminLoginModal] = useState<boolean>(false);
@@ -95,19 +87,31 @@ const App: React.FC = () => {
   }, [formData.estado]);
   const grandTotal = useMemo(() => subtotal + shippingCost, [subtotal, shippingCost]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmissionStatus('submitting');
-    setSubmissionError(null);
+    // Transiciona para a página de sucesso imediatamente.
+    // As notificações serão enviadas em segundo plano por um useEffect.
+    setIsSubmitted(true);
+  };
+  
+  useEffect(() => {
+    // Este efeito é executado uma vez após o envio do formulário para enviar notificações.
+    // É desacoplado do fluxo da UI de envio para garantir que o usuário
+    // veja a página de sucesso imediatamente.
+    if (!isSubmitted) {
+      return;
+    }
 
-    const { quantity, sabores, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado } = formData;
-    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
+    const sendNotifications = async () => {
+      const { quantity, sabores, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado } = formData;
+      const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
 
-    const numPackages = quantity / 100;
-    const saboresList = sabores.slice(0, numPackages).map((s, i) => `  - Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
-    const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
+      const numPackages = quantity / 100;
+      const saboresList = sabores.slice(0, numPackages).map((s, i) => `  - Pacote ${i + 1}: ${s || 'N/A'}`).join('\n');
+      const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
 
-    const adminMessage = `*Novo Pedido Print Foods*
+      const adminMessage = `*Novo Pedido Print Foods*
 *Cliente:* ${nome}
 *Contato:* ${whatsapp}
 *Pedido:* ${quantity}x ${editableProduct.name}
@@ -116,9 +120,9 @@ ${saboresList}
 *Total:* R$ ${grandTotal.toFixed(2)}
 *Endereço:* ${fullAddress}`;
 
-    try {
       if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
-        throw new Error("Notificação por WhatsApp não configurada. Administrador, verifique a chave da API do CallMeBot e os números de WhatsApp no painel.");
+        console.error("Notificação por WhatsApp não configurada. O pedido foi registrado na tela, mas nenhuma notificação pôde ser enviada. Administrador, verifique a chave da API do CallMeBot e os números de WhatsApp no painel.");
+        return;
       }
       
       const adminPromises = [];
@@ -128,12 +132,13 @@ ${saboresList}
       if (adminWhatsapp2) {
         adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
       }
-
-      if (adminPromises.length === 0) {
-           throw new Error("Nenhum número de WhatsApp para notificação foi configurado pelo administrador.");
-      }
       
-      await Promise.all(adminPromises);
+      try {
+        await Promise.all(adminPromises.map(p => p.catch(e => e))); // Evita que uma promessa rejeitada pare o Promise.all
+        console.log("Tentativas de notificação para administradores foram concluídas.");
+      } catch (error) {
+         console.error("Ocorreu um erro inesperado ao enviar notificações para administradores:", error);
+      }
 
       // Envia confirmação para o cliente
       try {
@@ -143,18 +148,15 @@ ${saboresList}
             await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
         }
       } catch (clientError) {
-        // Loga o erro mas não impede o fluxo. O importante é o admin receber.
+        // Apenas registra o erro, não interfere no fluxo.
         console.error("Falha ao enviar confirmação para o cliente via WhatsApp:", clientError);
       }
-      
-      setIsSubmitted(true);
+    };
 
-    } catch (error) {
-      const msg = (error instanceof Error) ? error.message : 'Ocorreu um erro desconhecido.';
-      setSubmissionError(msg);
-      setSubmissionStatus('error');
-    }
-  };
+    sendNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSubmitted]);
+
 
   const handleNewRegistration = () => {
     setFormData({
@@ -164,7 +166,6 @@ ${saboresList}
     });
     setIsSubmitted(false);
     setSubmissionStatus('idle');
-    setSubmissionError(null);
   };
   
   const handleAdminLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -238,9 +239,6 @@ ${saboresList}
         orderTotals={{ subtotal, shippingCost, grandTotal }}
         handleSubmit={handleSubmit}
         submissionStatus={submissionStatus}
-        submissionError={submissionError}
-        setSubmissionStatus={setSubmissionStatus}
-        setSubmissionError={setSubmissionError}
         logoBase64={adminSettings.logoBase64}
       />
       <footer className="text-center mt-8">

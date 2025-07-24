@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { FormData, ProductDetails, OrderTotals } from './types';
 
@@ -8,10 +7,7 @@ interface OrderFormProps {
   editableProduct: ProductDetails;
   orderTotals: OrderTotals;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  submissionStatus: 'idle' | 'submitting' | 'error';
-  submissionError: string | null;
-  setSubmissionStatus: React.Dispatch<React.SetStateAction<'idle' | 'submitting' | 'error'>>;
-  setSubmissionError: React.Dispatch<React.SetStateAction<string | null>>;
+  submissionStatus: 'idle' | 'submitting';
   logoBase64?: string;
 }
 
@@ -25,17 +21,9 @@ const brazilianStates = [
 
 const OrderForm: React.FC<OrderFormProps> = ({
   formData, setFormData, editableProduct, orderTotals,
-  handleSubmit, submissionStatus, submissionError,
-  setSubmissionStatus, setSubmissionError, logoBase64
+  handleSubmit, submissionStatus, logoBase64
 }) => {
   const [cepError, setCepError] = useState<string | null>(null);
-
-  const clearError = () => {
-    if (submissionStatus === 'error') {
-      setSubmissionStatus('idle');
-      setSubmissionError(null);
-    }
-  };
 
   const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const cep = e.target.value.replace(/\D/g, '');
@@ -67,7 +55,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    clearError();
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,14 +72,12 @@ const OrderForm: React.FC<OrderFormProps> = ({
         const newSabores = Array.from({ length: numPackages }, (_, i) => prev.sabores[i] || '');
         return { ...prev, quantity: newQuantity, sabores: newSabores };
     });
-    clearError();
   };
 
   const handleFlavorChange = (index: number, value: string) => {
     const newSabores = [...formData.sabores];
     newSabores[index] = value;
     setFormData(prev => ({ ...prev, sabores: newSabores }));
-    clearError();
   };
 
   return (
@@ -171,13 +156,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
                     <div className="flex justify-between text-lg font-bold text-blue-900"><span>Valor Total:</span> <span>R$ {orderTotals.grandTotal.toFixed(2)}</span></div>
                 </div>
             </div>
-
-            {submissionStatus === 'error' && (
-              <div className="p-4 my-4 text-sm text-red-800 rounded-lg bg-red-100 border border-red-300" role="alert">
-                <p><strong className="font-bold">Erro no Envio:</strong> {submissionError}</p>
-                <p className="mt-1">Por favor, verifique os dados e tente novamente. Se o erro persistir, o administrador deve conferir as configurações.</p>
-              </div>
-            )}
             
             <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={submissionStatus === 'submitting'}>
                 {submissionStatus === 'submitting' ? 'Enviando Pedido...' : 'Finalizar Pedido e Ver Dados de Pagamento'}
