@@ -32,6 +32,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   handleSubmit, submissionStatus, adminSettings
 }) => {
   const [cepError, setCepError] = useState<string | null>(null);
+  const [hoveredModelImage, setHoveredModelImage] = useState<string | null>(null);
 
   useEffect(() => {
     // Initialize flavor details when the component mounts if it's empty
@@ -134,9 +135,13 @@ const OrderForm: React.FC<OrderFormProps> = ({
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="p-4 bg-gray-50 rounded-lg border">
                 <h3 className="block text-lg font-medium text-gray-800 mb-4">1. Escolha o Modelo da Etiqueta:</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4" onMouseLeave={() => setHoveredModelImage(null)}>
                     {models.map(model => (
-                        <label key={model.id} className={`relative flex flex-col items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${formData.model === model.id ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-200 bg-white hover:border-blue-400'}`}>
+                        <label 
+                            key={model.id} 
+                            className={`relative flex flex-col items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${formData.model === model.id ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-200 bg-white hover:border-blue-400'}`}
+                            onMouseEnter={() => setHoveredModelImage(adminSettings[model.imageKey] as string || null)}
+                        >
                             <input type="radio" name="model" value={model.id} checked={formData.model === model.id} onChange={handleChange} required className="absolute opacity-0 w-0 h-0"/>
                             {adminSettings[model.imageKey] ? 
                                 <img src={adminSettings[model.imageKey] as string} alt={model.label} className="w-20 h-20 object-contain mb-2"/>
@@ -145,6 +150,20 @@ const OrderForm: React.FC<OrderFormProps> = ({
                             <span className="text-center text-sm font-semibold text-gray-700">{model.label}</span>
                         </label>
                     ))}
+                </div>
+
+                <div className="mt-4">
+                    <div className={`transition-all duration-300 ease-in-out overflow-hidden ${hoveredModelImage ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                        {hoveredModelImage && (
+                            <div className="w-full bg-gray-100 p-2 rounded-lg border-2 border-dashed flex justify-center items-center shadow-inner">
+                                <img 
+                                    src={hoveredModelImage} 
+                                    alt="Pré-visualização do modelo de etiqueta" 
+                                    className="w-full max-w-3xl h-auto rounded-md object-contain"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
