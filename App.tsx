@@ -63,21 +63,60 @@ const App: React.FC = () => {
     modelImageRect30x14: '',
     modelImageQuadrada20x20: '',
     modelOval17x25: '',
+    jsonBinApiKey: '',
+    jsonBinBinId: '',
   });
 
   useEffect(() => {
-    const savedSettings = localStorage.getItem('adminSettings');
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings);
-        setAdminSettings(prev => ({ ...prev, ...parsedSettings }));
-      } catch (error) {
-        console.error("Falha ao analisar as configurações de administrador do localStorage", error);
+    const loadInitialSettings = async () => {
+      let localSettings: Partial<AdminSettings> = {};
+      const savedSettingsString = localStorage.getItem('adminSettings');
+      if (savedSettingsString) {
+        try {
+          localSettings = JSON.parse(savedSettingsString);
+          setAdminSettings(prev => ({ ...prev, ...localSettings }));
+        } catch (e) {
+          console.error("Falha ao analisar as configurações de administrador do localStorage", e);
+        }
       }
-    }
+
+      const binId = localSettings.jsonBinBinId;
+      const apiKey = localSettings.jsonBinApiKey;
+
+      if (binId && apiKey) {
+        console.log("Credenciais JSONBin encontradas. Tentando carregar da nuvem...");
+        try {
+          const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
+            method: 'GET',
+            headers: { 'X-Access-Key': apiKey },
+          });
+          if (!response.ok) {
+            throw new Error(`Erro na rede: ${response.statusText}`);
+          }
+          const data = await response.json();
+          const cloudSettings = data.record;
+          
+          // Mantém as chaves locais caso não venham da nuvem, garantindo que não sejam perdidas.
+          cloudSettings.jsonBinBinId = binId;
+          cloudSettings.jsonBinApiKey = apiKey;
+
+          console.log("Configurações carregadas da nuvem com sucesso.");
+          setAdminSettings(prev => ({ ...prev, ...cloudSettings }));
+          // Atualiza o localStorage com os dados frescos da nuvem.
+          localStorage.setItem('adminSettings', JSON.stringify(cloudSettings));
+
+        } catch (error) {
+          console.error("Não foi possível buscar as configurações do JSONBin.io. Usando a versão local.", error);
+        }
+      }
+    };
+    
+    loadInitialSettings();
   }, []);
 
   useEffect(() => {
+    // Este efeito persiste qualquer mudança no localStorage.
+    // Essencial para salvar as chaves do JSONBin quando inseridas no painel.
     try {
       localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
     } catch (error) {
@@ -96,18 +135,11 @@ const App: React.FC = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmissionStatus('submitting');
-    // Transiciona para a página de sucesso imediatamente.
-    // As notificações serão enviadas em segundo plano por um useEffect.
     setIsSubmitted(true);
   };
   
   useEffect(() => {
-    // Este efeito é executado uma vez após o envio do formulário para enviar notificações.
-    // É desacoplado do fluxo da UI de envio para garantir que o usuário
-    // veja a página de sucesso imediatamente.
-    if (!isSubmitted) {
-      return;
-    }
+    if (!isSubmitted) return;
 
     const sendNotifications = async () => {
       const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
@@ -127,26 +159,21 @@ ${saboresList}
 *Endereço:* ${fullAddress}`;
 
       if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
-        console.error("Notificação por WhatsApp não configurada. O pedido foi registrado na tela, mas nenhuma notificação pôde ser enviada. Administrador, verifique a chave da API do CallMeBot e os números de WhatsApp no painel.");
+        console.error("Notificação por WhatsApp não configurada.");
         return;
       }
       
       const adminPromises = [];
-      if (adminWhatsapp) {
-        adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
-      }
-      if (adminWhatsapp2) {
-        adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
-      }
+      if (adminWhatsapp) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
+      if (adminWhatsapp2) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
       
       try {
-        await Promise.all(adminPromises.map(p => p.catch(e => e))); // Evita que uma promessa rejeitada pare o Promise.all
-        console.log("Tentativas de notificação para administradores foram concluídas.");
+        await Promise.all(adminPromises.map(p => p.catch(e => e)));
+        console.log("Tentativas de notificação para administradores concluídas.");
       } catch (error) {
-         console.error("Ocorreu um erro inesperado ao enviar notificações para administradores:", error);
+         console.error("Erro ao enviar notificações para administradores:", error);
       }
 
-      // Envia confirmação para o cliente
       try {
         if(whatsapp && callMeBotApiKey){
             const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
@@ -154,15 +181,12 @@ ${saboresList}
             await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
         }
       } catch (clientError) {
-        // Apenas registra o erro, não interfere no fluxo.
-        console.error("Falha ao enviar confirmação para o cliente via WhatsApp:", clientError);
+        console.error("Falha ao enviar confirmação para o cliente:", clientError);
       }
     };
 
     sendNotifications();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSubmitted]);
-
+  }, [isSubmitted, formData, adminSettings, grandTotal, editableProduct.name]);
 
   const handleNewRegistration = () => {
     setFormData({
@@ -192,12 +216,8 @@ ${saboresList}
     const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2 } = adminSettings;
     const testMessage = "Esta é uma mensagem de teste do sistema de pedidos da Print Foods.";
     
-    if (!callMeBotApiKey) {
-        return { success: false, error: "API Key do CallMeBot não configurada." };
-    }
-    if (!adminWhatsapp && !adminWhatsapp2) {
-        return { success: false, error: "Nenhum número de WhatsApp do administrador configurado." };
-    }
+    if (!callMeBotApiKey) return { success: false, error: "API Key do CallMeBot não configurada." };
+    if (!adminWhatsapp && !adminWhatsapp2) return { success: false, error: "Nenhum WhatsApp do administrador configurado." };
 
     try {
         const promises = [];
@@ -212,7 +232,6 @@ ${saboresList}
     }
   };
 
-  // Render Logic
   if (isAdminView) {
     return (
       <AdminPanel

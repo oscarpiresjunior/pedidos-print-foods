@@ -21,6 +21,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     adminSettings, setAdminSettings, editableProduct, setEditableProduct, onTestWhatsapp, onExitAdmin
 }) => {
     const [testWhatsappStatus, setTestWhatsappStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
+    const [syncStatus, setSyncStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
 
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -51,6 +52,38 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
+    const handleSaveAndSync = async () => {
+        setSyncStatus({ message: 'Sincronizando...', type: '' });
+        const { jsonBinBinId, jsonBinApiKey } = adminSettings;
+
+        if (!jsonBinBinId || !jsonBinApiKey) {
+            setSyncStatus({ message: 'Erro: Preencha o Bin ID e a Access Key do JSONBin.io para sincronizar.', type: 'error' });
+            return;
+        }
+
+        try {
+            const response = await fetch(`https://api.jsonbin.io/v3/b/${jsonBinBinId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Key': jsonBinApiKey,
+                    'X-Bin-Versioning': 'false', // Sobrescreve o bin em vez de criar uma nova versão
+                },
+                body: JSON.stringify(adminSettings),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
+                throw new Error(`Falha na sincronização: ${errorData.message}`);
+            }
+
+            setSyncStatus({ message: 'Configurações salvas e sincronizadas com sucesso!', type: 'success' });
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+            setSyncStatus({ message: msg, type: 'error' });
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
             <div className="bg-white p-6 sm:p-10 rounded-xl shadow-lg w-full max-w-4xl mx-auto">
@@ -60,6 +93,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </header>
 
                 <div className="space-y-8">
+                    {/* Sincronização na Nuvem */}
+                    <div className="p-6 bg-amber-50 rounded-lg shadow-md border border-amber-300">
+                        <h3 className="text-xl font-semibold text-amber-800 mb-4 border-b pb-3">Sincronização na Nuvem (JSONBin.io)</h3>
+                        <p className="text-sm text-amber-900 mb-4">
+                            Para sincronizar suas configurações entre dispositivos, crie uma conta em <a href="https://jsonbin.io" target="_blank" rel="noopener noreferrer" className="font-bold underline">JSONBin.io</a>, obtenha sua 'Access Key' e crie um 'Private Bin' para obter o 'Bin ID'.
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+                            <input 
+                                type="text" 
+                                name="jsonBinBinId" 
+                                placeholder="Seu Bin ID do JSONBin.io" 
+                                value={adminSettings.jsonBinBinId || ''} 
+                                onChange={handleSettingsChange} 
+                                className="mt-1 block w-full p-2 border rounded-md" 
+                            />
+                             <input 
+                                type="password" 
+                                name="jsonBinApiKey" 
+                                placeholder="Sua Access Key do JSONBin.io" 
+                                value={adminSettings.jsonBinApiKey || ''} 
+                                onChange={handleSettingsChange} 
+                                className="mt-1 block w-full p-2 border rounded-md" 
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleSaveAndSync}
+                            className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition-colors"
+                        >
+                            Salvar e Sincronizar na Nuvem
+                        </button>
+                        {syncStatus.message && <p className={`mt-3 text-sm font-medium ${syncStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{syncStatus.message}</p>}
+                    </div>
+
                     {/* Gerenciamento de Mídia */}
                     <div className="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
                         <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Gerenciamento de Mídia Principal</h3>

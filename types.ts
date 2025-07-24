@@ -1,4 +1,5 @@
 
+
 export interface FormData {
   nome: string;
   whatsapp: string;
@@ -34,6 +35,9 @@ export interface AdminSettings {
   modelImageRect30x14: string;
   modelImageQuadrada20x20: string;
   modelOval17x25: string;
+  // Campos para sincronização com JSONBin.io
+  jsonBinApiKey?: string;
+  jsonBinBinId?: string;
 }
 
 export interface OrderTotals {
