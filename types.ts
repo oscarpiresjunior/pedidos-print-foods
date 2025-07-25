@@ -23,23 +23,19 @@ export interface ProductDetails {
 }
 
 export interface AdminSettings {
+  id?: number; // Primary key for Supabase
   adminWhatsapp: string;
   adminWhatsapp2: string;
   orientationVideoUrl: string;
   callMeBotApiKey: string;
   pixKey: string;
   cnpj: string;
-  logoBase64: string;
-  pixQrBase64: string;
-  modelImageRect22x10Base64: string;
-  modelImageRect30x14Base64: string;
-  modelImageQuadrada20x20Base64: string;
-  modelImageOval17x25Base64: string;
-  // Chave para o serviço de hospedagem de imagens
-  imgbbApiKey?: string;
-  // Campos para sincronização com JSONBin.io
-  jsonBinApiKey?: string;
-  jsonBinBinId?: string;
+  logoUrl: string;
+  pixQrUrl: string;
+  modelImageUrlRect22x10: string;
+  modelImageUrlRect30x14: string;
+  modelImageUrlQuadrada20x20: string;
+  modelImageUrlOval17x25: string;
 }
 
 export interface OrderTotals {

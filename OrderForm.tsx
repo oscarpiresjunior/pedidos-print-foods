@@ -26,10 +26,10 @@ const brazilianStates = [
 const quantityOptions = Array.from({ length: (2000 - 500) / 100 + 1 }, (_, i) => 500 + i * 100);
 
 const models = [
-  { id: 'Retangular 22x10mm', labelLine1: 'Retangular', labelLine2: '22x10mm', imageKey: 'modelImageRect22x10Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_22_10 },
-  { id: 'Retangular 30x14mm', labelLine1: 'Retangular', labelLine2: '30x14mm', imageKey: 'modelImageRect30x14Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_30_14 },
-  { id: 'Quadrada 20x20mm', labelLine1: 'Quadrada', labelLine2: '20x20mm', imageKey: 'modelImageQuadrada20x20Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_SQUARE_20_20 },
-  { id: 'Oval 17x25mm', labelLine1: 'Oval', labelLine2: '17x25mm', imageKey: 'modelImageOval17x25Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_OVAL_17_25 }
+  { id: 'Retangular 22x10mm', labelLine1: 'Retangular', labelLine2: '22x10mm', imageKey: 'modelImageUrlRect22x10' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_22_10 },
+  { id: 'Retangular 30x14mm', labelLine1: 'Retangular', labelLine2: '30x14mm', imageKey: 'modelImageUrlRect30x14' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_30_14 },
+  { id: 'Quadrada 20x20mm', labelLine1: 'Quadrada', labelLine2: '20x20mm', imageKey: 'modelImageUrlQuadrada20x20' as keyof AdminSettings, placeholder: PLACEHOLDER_SQUARE_20_20 },
+  { id: 'Oval 17x25mm', labelLine1: 'Oval', labelLine2: '17x25mm', imageKey: 'modelImageUrlOval17x25' as keyof AdminSettings, placeholder: PLACEHOLDER_OVAL_17_25 }
 ];
 
 
@@ -141,7 +141,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
   return (
     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-4xl font-sans">
         <div className="text-center mb-8">
-            {adminSettings.logoBase64 && <img src={adminSettings.logoBase64} alt="Logo Print Foods" className="mx-auto h-20 w-auto mb-2" />}
+            {adminSettings.logoUrl && <img src={adminSettings.logoUrl} alt="Logo Print Foods" className="mx-auto h-20 w-auto mb-2" />}
             <h1 className="text-3xl font-bold text-blue-600">Print Foods ®</h1>
             <p className="text-md text-gray-600 mt-2">Olá, aluna do curso Minha Fábrica de Crepes! Faça seu pedido aqui.</p>
         </div>

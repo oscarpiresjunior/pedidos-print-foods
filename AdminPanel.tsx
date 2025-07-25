@@ -1,4 +1,6 @@
+
 import React, { useState } from 'react';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { AdminSettings, ProductDetails } from './types';
 
 interface AdminPanelProps {
@@ -8,38 +10,59 @@ interface AdminPanelProps {
     setEditableProduct: React.Dispatch<React.SetStateAction<ProductDetails>>;
     onTestWhatsapp: () => Promise<{ success: boolean; error?: string }>;
     onExitAdmin: () => void;
+    supabase: SupabaseClient | null;
 }
 
 const modelsToManage = [
-  { key: 'modelImageRect22x10Base64', label: 'Retangular 22x10mm' },
-  { key: 'modelImageRect30x14Base64', label: 'Retangular 30x14mm' },
-  { key: 'modelImageQuadrada20x20Base64', label: 'Quadrada 20x20mm' },
-  { key: 'modelImageOval17x25Base64', label: 'Oval 17x25mm' }
+  { key: 'modelImageUrlRect22x10', label: 'Retangular 22x10mm' },
+  { key: 'modelImageUrlRect30x14', label: 'Retangular 30x14mm' },
+  { key: 'modelImageUrlQuadrada20x20', label: 'Quadrada 20x20mm' },
+  { key: 'modelImageUrlOval17x25', label: 'Oval 17x25mm' }
 ];
 
+const MEDIA_BUCKET = 'media';
+
 const AdminPanel: React.FC<AdminPanelProps> = ({
-    adminSettings, setAdminSettings, editableProduct, setEditableProduct, onTestWhatsapp, onExitAdmin
+    adminSettings, setAdminSettings, editableProduct, setEditableProduct, 
+    onTestWhatsapp, onExitAdmin, supabase
 }) => {
     const [testWhatsappStatus, setTestWhatsappStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
     const [syncStatus, setSyncStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
+    const [isUploading, setIsUploading] = useState<string | null>(null);
 
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setAdminSettings(prev => ({ ...prev, [name]: value as any }));
+        setAdminSettings(prev => ({ ...prev, [name]: value }));
     };
 
     const handleProductChange = (field: keyof ProductDetails, value: string | number) => {
         setEditableProduct(prev => ({ ...prev, [field]: field === 'price' ? Number(value) : value }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof AdminSettings) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof AdminSettings) => {
+        if (!supabase) {
+            setSyncStatus({ message: 'Conexão com Supabase não estabelecida. Verifique o config.ts', type: 'error' });
+            return;
+        }
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            setAdminSettings(prev => ({ ...prev, [field]: reader.result as string }));
-        };
-        reader.readAsDataURL(file);
+
+        setIsUploading(field);
+        setSyncStatus({ message: `Fazendo upload de ${file.name}...`, type: ''});
+
+        const filePath = `public/${field}-${Date.now()}`;
+        const { error: uploadError } = await supabase.storage.from(MEDIA_BUCKET).upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+            setSyncStatus({ message: `Erro no upload: ${uploadError.message}`, type: 'error' });
+            setIsUploading(null);
+            return;
+        }
+
+        const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(filePath);
+        setAdminSettings(prev => ({ ...prev, [field]: data.publicUrl }));
+        setSyncStatus({ message: `${file.name} enviado com sucesso!`, type: 'success' });
+        setIsUploading(null);
     };
 
     const handleTestWhatsappClick = async () => {
@@ -54,33 +77,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const handleSaveAndSync = async () => {
         setSyncStatus({ message: 'Sincronizando...', type: '' });
-        const { jsonBinBinId, jsonBinApiKey } = adminSettings;
-
-        if (!jsonBinBinId || !jsonBinApiKey) {
-            setSyncStatus({ message: 'Erro: Preencha o Bin ID e a Access Key do JSONBin.io para sincronizar.', type: 'error' });
+        
+        if (!supabase) {
+            setSyncStatus({ message: 'Erro: Conexão com Supabase não disponível. Verifique as credenciais no arquivo config.ts.', type: 'error' });
             return;
         }
+        
+        const settingsToSave = { ...adminSettings, id: 1 };
 
-        try {
-            const response = await fetch(`https://api.jsonbin.io/v3/b/${jsonBinBinId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Access-Key': jsonBinApiKey,
-                    'X-Bin-Versioning': 'false', // Sobrescreve o bin em vez de criar uma nova versão
-                },
-                body: JSON.stringify(adminSettings),
-            });
+        const { data: settingsData, error: settingsError } = await supabase.from('settings').upsert(settingsToSave).select().single();
+        const { data: productData, error: productError } = await supabase.from('products').upsert(editableProduct).select().single();
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido.' }));
-                throw new Error(`Falha na sincronização: ${errorData.message}`);
-            }
-
+        if (settingsError || productError) {
+            const errorMsg = settingsError?.message || productError?.message || 'Ocorreu um erro desconhecido.';
+            setSyncStatus({ message: `Falha na sincronização: ${errorMsg}`, type: 'error' });
+        } else {
+            if(settingsData) setAdminSettings(settingsData);
+            if(productData) setEditableProduct(productData);
             setSyncStatus({ message: 'Configurações salvas e sincronizadas com sucesso!', type: 'success' });
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-            setSyncStatus({ message: msg, type: 'error' });
         }
     };
 
@@ -95,36 +109,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="space-y-8">
                     {/* Sincronização na Nuvem */}
                     <div className="p-6 bg-amber-50 rounded-lg shadow-md border border-amber-300">
-                        <h3 className="text-xl font-semibold text-amber-800 mb-4 border-b pb-3">Sincronização na Nuvem (JSONBin.io)</h3>
-                        <p className="text-sm text-amber-900 mb-4">
-                            Para sincronizar suas configurações entre dispositivos, crie uma conta em <a href="https://jsonbin.io" target="_blank" rel="noopener noreferrer" className="font-bold underline">JSONBin.io</a>, obtenha sua 'Access Key' e crie um 'Private Bin' para obter o 'Bin ID'.
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
-                            <input 
-                                type="text" 
-                                name="jsonBinBinId" 
-                                placeholder="Seu Bin ID do JSONBin.io" 
-                                value={adminSettings.jsonBinBinId || ''} 
-                                onChange={handleSettingsChange} 
-                                className="mt-1 block w-full p-2 border rounded-md" 
-                            />
-                             <input 
-                                type="password" 
-                                name="jsonBinApiKey" 
-                                placeholder="Sua Access Key do JSONBin.io" 
-                                value={adminSettings.jsonBinApiKey || ''} 
-                                onChange={handleSettingsChange} 
-                                className="mt-1 block w-full p-2 border rounded-md" 
-                            />
+                        <h3 className="text-xl font-semibold text-amber-800 mb-4 border-b pb-3">Sincronização na Nuvem (Supabase)</h3>
+                        
+                        {!supabase ? (
+                             <div className="p-4 bg-red-100 border-l-4 border-red-500 text-red-800">
+                                <p className="font-bold">Conexão Falhou!</p>
+                                <p className="text-sm mt-1">Verifique se a URL e a Chave Anon do Supabase estão corretamente preenchidas no arquivo <strong>config.ts</strong>.</p>
+                            </div>
+                        ) : (
+                             <div className="p-4 bg-green-100 border-l-4 border-green-500 text-green-800">
+                                <p className="font-bold">Conectado ao Supabase!</p>
+                                <p className="text-sm mt-1">A aplicação está pronta para sincronizar os dados na nuvem. Clique no botão abaixo para salvar quaisquer alterações.</p>
+                            </div>
+                        )}
+
+                        <div className="mt-4">
+                            <button
+                                type="button"
+                                onClick={handleSaveAndSync}
+                                disabled={!supabase}
+                                className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                Salvar Alterações na Nuvem
+                            </button>
+                            {syncStatus.message && <p className={`mt-3 text-sm font-medium ${syncStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{syncStatus.message}</p>}
                         </div>
-                        <button
-                            type="button"
-                            onClick={handleSaveAndSync}
-                            className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition-colors"
-                        >
-                            Salvar e Sincronizar na Nuvem
-                        </button>
-                        {syncStatus.message && <p className={`mt-3 text-sm font-medium ${syncStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{syncStatus.message}</p>}
                     </div>
 
                     {/* Gerenciamento de Mídia */}
@@ -132,14 +141,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Gerenciamento de Mídia Principal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
                             <div>
-                                <label htmlFor="logoUpload" className="block text-sm font-medium text-gray-700">Logo da Empresa</label>
-                                <input type="file" id="logoUpload" accept="image/*" onChange={(e) => handleFileChange(e, 'logoBase64')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
-                                {adminSettings.logoBase64 && <img src={adminSettings.logoBase64} alt="Logo Preview" className="mt-2 h-16 w-auto border rounded p-1"/>}
+                                <label htmlFor="logoUrl" className="block text-sm font-medium text-gray-700">Logo da Empresa</label>
+                                <input type="file" id="logoUrl" accept="image/*" onChange={(e) => handleFileChange(e, 'logoUrl')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
+                                {adminSettings.logoUrl && <img src={adminSettings.logoUrl} alt="Logo Preview" className="mt-2 h-16 w-auto border rounded p-1"/>}
+                                {isUploading === 'logoUrl' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
                             </div>
                             <div>
-                                <label htmlFor="pixQrUpload" className="block text-sm font-medium text-gray-700">QR Code do PIX</label>
-                                <input type="file" id="pixQrUpload" accept="image/*" onChange={(e) => handleFileChange(e, 'pixQrBase64')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
-                                {adminSettings.pixQrBase64 && <img src={adminSettings.pixQrBase64} alt="PIX QR Code Preview" className="mt-2 h-16 w-16 border rounded p-1"/>}
+                                <label htmlFor="pixQrUrl" className="block text-sm font-medium text-gray-700">QR Code do PIX</label>
+                                <input type="file" id="pixQrUrl" accept="image/*" onChange={(e) => handleFileChange(e, 'pixQrUrl')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
+                                {adminSettings.pixQrUrl && <img src={adminSettings.pixQrUrl} alt="PIX QR Code Preview" className="mt-2 h-16 w-16 border rounded p-1"/>}
+                                {isUploading === 'pixQrUrl' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
                             </div>
                         </div>
                     </div>
@@ -151,9 +162,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                            {modelsToManage.map(model => (
                              <div key={model.key}>
                                 <label htmlFor={model.key} className="block text-sm font-medium text-gray-700">{model.label}</label>
-                                <input type="file" id={model.key} accept="image/*" onChange={(e) => handleFileChange(e, model.key as keyof AdminSettings)} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"/>
+                                <input type="file" id={model.key} accept="image/*" onChange={(e) => handleFileChange(e, model.key as keyof AdminSettings)} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
                                 {adminSettings[model.key as keyof AdminSettings] && <img src={adminSettings[model.key as keyof AdminSettings] as string} alt={`${model.label} Preview`} className="mt-2 h-16 w-auto border rounded p-1"/>}
-                             </div>
+                                {isUploading === model.key && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
+                            </div>
                            ))}
                         </div>
                     </div>

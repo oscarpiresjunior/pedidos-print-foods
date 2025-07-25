@@ -1,9 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AdminSettings, FormData, ProductDetails } from './types';
 import OrderForm from './OrderForm';
 import SuccessPage from './SuccessPage';
 import AdminPanel from './AdminPanel';
-import { ADMIN_USERNAME, ADMIN_PASSWORD } from './config';
+import { ADMIN_USERNAME, ADMIN_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
 
 // Função utilitária para enviar WhatsApp via CallMeBot
 const sendWhatsAppViaCallMeBot = async (message: string, phoneNumber: string, apiKey: string): Promise<void> => {
@@ -15,13 +17,10 @@ const sendWhatsAppViaCallMeBot = async (message: string, phoneNumber: string, ap
   const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumberOnlyDigits}&text=${encodedMessage}&apikey=${apiKey}`;
 
   try {
-    // Usando 'no-cors' para evitar problemas de CORS que podem ser interpretados como erros de rede.
-    // A chamada é "dispare e esqueça", assumindo que funciona se não houver um erro de rede real.
     await fetch(url, { method: 'GET', mode: 'no-cors' });
     console.log(`Tentativa de envio de mensagem do WhatsApp para ${phoneNumber} efetuada.`);
   } catch (error) {
     console.error("Erro de rede ao tentar enviar mensagem via CallMeBot:", error);
-    // Propaga o erro para que a função chamadora (como o botão de teste) saiba da falha.
     throw new Error(`Erro de rede ao enviar notificação para ${phoneNumber}.`);
   }
 };
@@ -50,6 +49,7 @@ const App: React.FC = () => {
   const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
 
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
     adminWhatsapp: '5522997146538',
     adminWhatsapp2: '',
@@ -57,77 +57,62 @@ const App: React.FC = () => {
     callMeBotApiKey: '',
     pixKey: 'beaf7a1f-df15-4695-aa30-593c46629de7',
     cnpj: '',
-    logoBase64: '',
-    pixQrBase64: '',
-    modelImageRect22x10Base64: '',
-    modelImageRect30x14Base64: '',
-    modelImageQuadrada20x20Base64: '',
-    modelImageOval17x25Base64: '',
-    jsonBinApiKey: '',
-    jsonBinBinId: '',
-    imgbbApiKey: '',
+    logoUrl: '',
+    pixQrUrl: '',
+    modelImageUrlRect22x10: '',
+    modelImageUrlRect30x14: '',
+    modelImageUrlQuadrada20x20: '',
+    modelImageUrlOval17x25: '',
   });
 
   useEffect(() => {
-    const loadInitialSettings = async () => {
-      let localSettings: Partial<AdminSettings> = {};
-      const savedSettingsString = localStorage.getItem('adminSettings');
-      if (savedSettingsString) {
-        try {
-          localSettings = JSON.parse(savedSettingsString);
-          setAdminSettings(prev => ({ ...prev, ...localSettings }));
-        } catch (e) {
-          console.error("Falha ao analisar as configurações de administrador do localStorage", e);
-        }
+    // Inicializa o cliente Supabase com credenciais do arquivo de configuração
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      setSupabase(client);
+    } else {
+      console.warn("Supabase URL e Chave Anon não estão configuradas no arquivo config.ts. A sincronização de dados estará desativada.");
+    }
+  }, []);
+  
+  useEffect(() => {
+    // Carrega dados do Supabase assim que o cliente estiver pronto
+    const loadDataFromSupabase = async () => {
+      if (!supabase) return;
+      
+      console.log("Cliente Supabase pronto. Carregando dados...");
+
+      // Carrega configurações
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      
+      if (settingsError) {
+        console.error("Erro ao carregar configurações do Supabase:", settingsError.message);
+      } else if (settingsData) {
+        console.log("Configurações carregadas do Supabase.");
+        setAdminSettings(settingsData as AdminSettings);
       }
 
-      const binId = localSettings.jsonBinBinId;
-      const apiKey = localSettings.jsonBinApiKey;
-
-      if (binId && apiKey) {
-        console.log("Credenciais JSONBin encontradas. Tentando carregar da nuvem...");
-        try {
-          const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
-            method: 'GET',
-            headers: { 'X-Access-Key': apiKey },
-          });
-          if (!response.ok) {
-            throw new Error(`Erro na rede: ${response.statusText}`);
-          }
-          const data = await response.json();
-          const cloudSettings = data.record;
-          
-          // Mantém as chaves locais caso não venham da nuvem, garantindo que não sejam perdidas.
-          cloudSettings.jsonBinBinId = binId;
-          cloudSettings.jsonBinApiKey = apiKey;
-          // Mantém a chave do imgbb se não vier da nuvem, para não perdê-la.
-          if (!cloudSettings.imgbbApiKey && localSettings.imgbbApiKey) {
-            cloudSettings.imgbbApiKey = localSettings.imgbbApiKey;
-          }
-
-          console.log("Configurações carregadas da nuvem com sucesso.");
-          setAdminSettings(prev => ({ ...prev, ...cloudSettings }));
-          // Atualiza o localStorage com os dados frescos da nuvem.
-          localStorage.setItem('adminSettings', JSON.stringify(cloudSettings));
-
-        } catch (error) {
-          console.error("Não foi possível buscar as configurações do JSONBin.io. Usando a versão local.", error);
-        }
+      // Carrega produto
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', 'etiquetas_comestiveis')
+        .single();
+        
+      if (productError) {
+        console.error("Erro ao carregar produto do Supabase:", productError.message);
+      } else if (productData) {
+        console.log("Produto carregado do Supabase.");
+        setEditableProduct(productData as ProductDetails);
       }
     };
     
-    loadInitialSettings();
-  }, []);
-
-  useEffect(() => {
-    // Este efeito persiste qualquer mudança no localStorage.
-    // Essencial para salvar as chaves quando inseridas no painel.
-    try {
-      localStorage.setItem('adminSettings', JSON.stringify(adminSettings));
-    } catch (error) {
-      console.error("Falha ao salvar as configurações de administrador no localStorage", error);
-    }
-  }, [adminSettings]);
+    loadDataFromSupabase();
+  }, [supabase]);
 
   const subtotal = useMemo(() => (formData.quantity / 100) * editableProduct.price, [formData.quantity, editableProduct.price]);
   const shippingCost = useMemo(() => {
@@ -143,55 +128,57 @@ const App: React.FC = () => {
     setIsSubmitted(true);
   };
   
-  useEffect(() => {
-    if (!isSubmitted) return;
+  const { name: productName } = editableProduct;
 
-    const sendNotifications = async () => {
-      const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
-      const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
+  const sendNotifications = useCallback(async () => {
+    const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
+    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
 
-      const saboresList = flavorDetails.map(f => `  - ${f.quantity}x de ${f.name || 'Sabor não definido'}`).join('\n');
-      const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
+    const saboresList = flavorDetails.map(f => `  - ${f.quantity}x de ${f.name || 'Sabor não definido'}`).join('\n');
+    const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
 
-      const adminMessage = `*Novo Pedido Print Foods*
+    const adminMessage = `*Novo Pedido Print Foods*
 *Cliente:* ${nome}
 *Contato:* ${whatsapp}
 *Modelo:* ${model}
-*Pedido:* ${quantity}x ${editableProduct.name}
+*Pedido:* ${quantity}x ${productName}
 *Sabores:*
 ${saboresList}
 *Total:* R$ ${grandTotal.toFixed(2)}
 *Endereço:* ${fullAddress}`;
 
-      if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
-        console.error("Notificação por WhatsApp não configurada.");
-        return;
-      }
-      
-      const adminPromises = [];
-      if (adminWhatsapp) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
-      if (adminWhatsapp2) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
-      
-      try {
-        await Promise.all(adminPromises.map(p => p.catch(e => e)));
-        console.log("Tentativas de notificação para administradores concluídas.");
-      } catch (error) {
-         console.error("Erro ao enviar notificações para administradores:", error);
-      }
+    if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
+      console.error("Notificação por WhatsApp não configurada.");
+      return;
+    }
+    
+    const adminPromises = [];
+    if (adminWhatsapp) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
+    if (adminWhatsapp2) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
+    
+    try {
+      await Promise.all(adminPromises.map(p => p.catch(e => e)));
+      console.log("Tentativas de notificação para administradores concluídas.");
+    } catch (error) {
+       console.error("Erro ao enviar notificações para administradores:", error);
+    }
 
-      try {
-        if(whatsapp && callMeBotApiKey){
-            const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
-            const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${editableProduct.name}\n- *Modelo:* ${model}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
-            await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
-        }
-      } catch (clientError) {
-        console.error("Falha ao enviar confirmação para o cliente:", clientError);
+    try {
+      if(whatsapp && callMeBotApiKey){
+          const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
+          const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${productName}\n- *Modelo:* ${model}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
+          await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
       }
-    };
+    } catch (clientError) {
+      console.error("Falha ao enviar confirmação para o cliente:", clientError);
+    }
+  }, [formData, adminSettings, grandTotal, productName]);
 
-    sendNotifications();
-  }, [isSubmitted, formData, adminSettings, grandTotal, editableProduct.name]);
+  useEffect(() => {
+    if (isSubmitted) {
+      sendNotifications();
+    }
+  }, [isSubmitted, sendNotifications]);
 
   const handleNewRegistration = () => {
     setFormData({
@@ -246,6 +233,7 @@ ${saboresList}
         setEditableProduct={setEditableProduct}
         onTestWhatsapp={handleTestWhatsapp}
         onExitAdmin={() => setIsAdminView(false)}
+        supabase={supabase}
       />
     );
   }
