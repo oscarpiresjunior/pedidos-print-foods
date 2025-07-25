@@ -85,15 +85,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         
         const settingsToSave = { ...adminSettings, id: 1 };
 
-        const { data: settingsData, error: settingsError } = await supabase.from('settings').upsert(settingsToSave).select().single();
-        const { data: productData, error: productError } = await supabase.from('products').upsert(editableProduct).select().single();
+        const { data: settingsData, error: settingsError } = await supabase.from('settings').upsert([settingsToSave]).select().single();
+        const { data: productData, error: productError } = await supabase.from('products').upsert([editableProduct]).select().single();
 
         if (settingsError || productError) {
             const errorMsg = settingsError?.message || productError?.message || 'Ocorreu um erro desconhecido.';
             setSyncStatus({ message: `Falha na sincronização: ${errorMsg}`, type: 'error' });
         } else {
             if(settingsData) setAdminSettings(settingsData);
-            if(productData) setEditableProduct(productData);
+            if(productData) setEditableProduct(productData as ProductDetails);
             setSyncStatus({ message: 'Configurações salvas e sincronizadas com sucesso!', type: 'success' });
         }
     };

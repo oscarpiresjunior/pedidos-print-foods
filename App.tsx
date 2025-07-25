@@ -127,12 +127,11 @@ const App: React.FC = () => {
     setSubmissionStatus('submitting');
     setIsSubmitted(true);
   };
-  
-  const { name: productName } = editableProduct;
 
   const sendNotifications = useCallback(async () => {
     const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
     const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
+    const { name: productName } = editableProduct;
 
     const saboresList = flavorDetails.map(f => `  - ${f.quantity}x de ${f.name || 'Sabor não definido'}`).join('\n');
     const fullAddress = `${logradouro}, ${numero} - ${bairro}, ${cidade} - ${estado}, CEP: ${cep}`;
@@ -166,13 +165,13 @@ ${saboresList}
     try {
       if(whatsapp && callMeBotApiKey){
           const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
-          const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${productName}\n- *Modelo:* ${model}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
+          const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${productName}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
           await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
       }
     } catch (clientError) {
       console.error("Falha ao enviar confirmação para o cliente:", clientError);
     }
-  }, [formData, adminSettings, grandTotal, productName]);
+  }, [formData, adminSettings, grandTotal, editableProduct]);
 
   useEffect(() => {
     if (isSubmitted) {

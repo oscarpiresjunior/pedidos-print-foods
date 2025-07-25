@@ -260,21 +260,23 @@ const OrderForm: React.FC<OrderFormProps> = ({
         </div>
 
         {/* WhatsApp Support Button */}
-        <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-             <p className="text-gray-700 mb-3">Dúvidas? Fale conosco antes de finalizar o pedido!</p>
-             <a 
-               href={`https://wa.me/${adminSettings.adminWhatsapp.replace(/\D/g, '')}?text=Olá! Tenho uma dúvida sobre o pedido de etiquetas.`}
-               target="_blank"
-               rel="noopener noreferrer"
-               className="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105"
-             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM14.23 13.32c-.32.32-1 .5-1.54.2l-1.63-1c-.24-.15-.58-.12-.78.08l-1.32 1.32c-.45.45-1.18.5-1.69.1l-2.78-2.17a5.53 5.53 0 01-1.3-2.1L4.8 7.02c-.2-.5.05-1.1.5-1.32l1.32-1.32c.2-.2.23-.54.08-.78l-1-1.63c-.27-.45-.9-.6-1.36-.32l-.28.17a1.64 1.64 0 00-1.02 1.54 8.58 8.58 0 008.58 8.58c.6 0 1.15-.36 1.4-.85l.17-.28c.27-.46.12-1.1-.32-1.36z" />
-                </svg>
-                Falar no WhatsApp
-             </a>
-             <p className="text-xs text-gray-500 mt-2">(Atendimento de 9h às 17h)</p>
-        </div>
+        {adminSettings.adminWhatsapp && (
+          <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-gray-700 mb-3">Dúvidas? Fale conosco antes de finalizar o pedido!</p>
+              <a 
+                href={`https://wa.me/${adminSettings.adminWhatsapp.replace(/\D/g, '')}?text=Olá! Tenho uma dúvida sobre o pedido de etiquetas.`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105"
+              >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM14.23 13.32c-.32.32-1 .5-1.54.2l-1.63-1c-.24-.15-.58-.12-.78.08l-1.32 1.32c-.45.45-1.18.5-1.69.1l-2.78-2.17a5.53 5.53 0 01-1.3-2.1L4.8 7.02c-.2-.5.05-1.1.5-1.32l1.32-1.32c.2-.2.23-.54.08-.78l-1-1.63c-.27-.45-.9-.6-1.36-.32l-.28.17a1.64 1.64 0 00-1.02 1.54 8.58 8.58 0 008.58 8.58c.6 0 1.15-.36 1.4-.85l.17-.28c.27-.46.12-1.1-.32-1.36z" />
+                  </svg>
+                  Falar no WhatsApp
+              </a>
+              <p className="text-xs text-gray-500 mt-2">(Atendimento de 9h às 17h)</p>
+          </div>
+        )}
 
         <button type="submit" disabled={submissionStatus === 'submitting' || !formData.model} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg text-lg transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed">
           {submissionStatus === 'submitting' ? 'Enviando Pedido...' : 'Finalizar Pedido'}
