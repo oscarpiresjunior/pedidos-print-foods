@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { AdminSettings, ProductDetails } from './types';
 
@@ -29,6 +29,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [testWhatsappStatus, setTestWhatsappStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
     const [syncStatus, setSyncStatus] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
     const [isUploading, setIsUploading] = useState<string | null>(null);
+
+    // State to track initial data to detect unsaved changes
+    const [initialSettings, setInitialSettings] = useState<AdminSettings>(adminSettings);
+    const [initialProduct, setInitialProduct] = useState<ProductDetails>(editableProduct);
+
+    const hasUnsavedChanges = useMemo(() => {
+        return JSON.stringify(adminSettings) !== JSON.stringify(initialSettings) ||
+               JSON.stringify(editableProduct) !== JSON.stringify(initialProduct);
+    }, [adminSettings, editableProduct, initialSettings, initialProduct]);
 
     const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -75,35 +84,74 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    const handleSaveAndSync = async () => {
+    const handleSaveAndSync = async (): Promise<{ success: boolean }> => {
         setSyncStatus({ message: 'Sincronizando...', type: '' });
         
         if (!supabase) {
             setSyncStatus({ message: 'Erro: Conexão com Supabase não disponível. Verifique as credenciais no arquivo config.ts.', type: 'error' });
-            return;
+            return { success: false };
         }
         
         const settingsToSave = { ...adminSettings, id: 1 };
 
-        const { data: settingsData, error: settingsError } = await supabase.from('settings').upsert([settingsToSave]).select().single();
-        const { data: productData, error: productError } = await supabase.from('products').upsert([editableProduct]).select().single();
+        const { data: settingsData, error: settingsError } = await supabase.from('settings').upsert(settingsToSave).select().single();
+        const { data: productData, error: productError } = await supabase.from('products').upsert(editableProduct).select().single();
 
         if (settingsError || productError) {
             const errorMsg = settingsError?.message || productError?.message || 'Ocorreu um erro desconhecido.';
             setSyncStatus({ message: `Falha na sincronização: ${errorMsg}`, type: 'error' });
+            return { success: false };
         } else {
-            if(settingsData) setAdminSettings(settingsData);
-            if(productData) setEditableProduct(productData as ProductDetails);
+            if(settingsData) {
+                setAdminSettings(settingsData as AdminSettings);
+                setInitialSettings(settingsData as AdminSettings);
+            }
+            if(productData) {
+                const typedProductData = productData as ProductDetails;
+                setEditableProduct(typedProductData);
+                setInitialProduct(typedProductData);
+            }
             setSyncStatus({ message: 'Configurações salvas e sincronizadas com sucesso!', type: 'success' });
+            setTimeout(() => setSyncStatus({ message: '', type: '' }), 4000);
+            return { success: true };
+        }
+    };
+
+    const handleExitRequest = async () => {
+        if (hasUnsavedChanges) {
+            if (window.confirm("Você tem alterações não salvas. Deseja salvar antes de sair?")) {
+                const { success } = await handleSaveAndSync();
+                if (success) {
+                    onExitAdmin();
+                }
+            } else {
+                setAdminSettings(initialSettings);
+                setEditableProduct(initialProduct);
+                onExitAdmin();
+            }
+        } else {
+            onExitAdmin();
         }
     };
 
     return (
         <div className="min-h-screen bg-gray-100 p-4 sm:p-6 md:p-8 font-sans">
             <div className="bg-white p-6 sm:p-10 rounded-xl shadow-lg w-full max-w-4xl mx-auto">
-                <header className="flex justify-between items-center mb-10">
+                <header className="flex justify-between items-center mb-10 pb-4 border-b">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-700">Painel Administrativo</h1>
-                    <button onClick={onExitAdmin} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors">Sair</button>
+                    <div className="flex items-center space-x-4">
+                        <button
+                            type="button"
+                            onClick={handleSaveAndSync}
+                            disabled={!supabase || isUploading !== null || !hasUnsavedChanges}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            Salvar Alterações
+                        </button>
+                        <button onClick={handleExitRequest} className="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md shadow-md transition-colors">
+                            Sair
+                        </button>
+                    </div>
                 </header>
 
                 <div className="space-y-8">
@@ -119,20 +167,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         ) : (
                              <div className="p-4 bg-green-100 border-l-4 border-green-500 text-green-800">
                                 <p className="font-bold">Conectado ao Supabase!</p>
-                                <p className="text-sm mt-1">A aplicação está pronta para sincronizar os dados na nuvem. Clique no botão abaixo para salvar quaisquer alterações.</p>
+                                <p className="text-sm mt-1">A aplicação está pronta para sincronizar os dados na nuvem. Clique no botão "Salvar Alterações" no topo para guardar seu trabalho.</p>
                             </div>
                         )}
 
                         <div className="mt-4">
-                            <button
-                                type="button"
-                                onClick={handleSaveAndSync}
-                                disabled={!supabase}
-                                className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-5 rounded-md shadow-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                Salvar Alterações na Nuvem
-                            </button>
-                            {syncStatus.message && <p className={`mt-3 text-sm font-medium ${syncStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{syncStatus.message}</p>}
+                             {syncStatus.message && <p className={`text-sm font-medium ${syncStatus.type === 'success' ? 'text-green-700' : syncStatus.type === 'error' ? 'text-red-700' : 'text-gray-800'}`}>{syncStatus.message}</p>}
                         </div>
                     </div>
 

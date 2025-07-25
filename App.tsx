@@ -29,8 +29,8 @@ const App: React.FC = () => {
   const [editableProduct, setEditableProduct] = useState<ProductDetails>({
     id: 'etiquetas_comestiveis',
     name: 'Etiquetas Comestíveis Personalizadas',
-    description: 'Etiquetas personalizadas com o sabor à sua escolha para aplicar nos seus crepes.\nDesconto exclusivo de 20% para alunas do curso Minha Fábrica de Crepes.',
-    price: 25.21,
+    description: '',
+    price: 0,
   });
   
   const [formData, setFormData] = useState<FormData>({
@@ -51,11 +51,11 @@ const App: React.FC = () => {
 
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
-    adminWhatsapp: '5522997146538',
+    adminWhatsapp: '',
     adminWhatsapp2: '',
     orientationVideoUrl: '',
     callMeBotApiKey: '',
-    pixKey: 'beaf7a1f-df15-4695-aa30-593c46629de7',
+    pixKey: '',
     cnpj: '',
     logoUrl: '',
     pixQrUrl: '',
@@ -151,16 +151,16 @@ ${saboresList}
       return;
     }
     
-    const adminPromises = [];
+    const adminPromises: Promise<void>[] = [];
     if (adminWhatsapp) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
     if (adminWhatsapp2) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
     
-    try {
-      await Promise.all(adminPromises.map(p => p.catch(e => e)));
-      console.log("Tentativas de notificação para administradores concluídas.");
-    } catch (error) {
-       console.error("Erro ao enviar notificações para administradores:", error);
-    }
+    // Using Promise.allSettled is a modern and safer way to handle multiple promises
+    // when you want to wait for all of them to complete, regardless of whether they
+    // succeed or fail. This avoids the type complexity of the .map/.catch pattern that
+    // was causing the "type instantiation is excessively deep" error.
+    await Promise.allSettled(adminPromises);
+    console.log("Tentativas de notificação para administradores concluídas.");
 
     try {
       if(whatsapp && callMeBotApiKey){
