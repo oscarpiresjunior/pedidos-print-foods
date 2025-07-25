@@ -7,23 +7,41 @@ import SuccessPage from './SuccessPage';
 import AdminPanel from './AdminPanel';
 import { ADMIN_USERNAME, ADMIN_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
 
-// Função utilitária para enviar WhatsApp via CallMeBot
+// Função utilitária para enviar WhatsApp via CallMeBot com tratamento de erro aprimorado
 const sendWhatsAppViaCallMeBot = async (message: string, phoneNumber: string, apiKey: string): Promise<void> => {
   if (!apiKey || !phoneNumber) {
-    throw new Error("CallMeBot API Key ou número de telefone não configurado.");
+    const errorMsg = "CallMeBot API Key ou número de telefone não configurado.";
+    console.error(`CallMeBot: ${errorMsg}`);
+    throw new Error(errorMsg);
   }
   const phoneNumberOnlyDigits = phoneNumber.replace(/\D/g, '');
   const encodedMessage = encodeURIComponent(message);
   const url = `https://api.callmebot.com/whatsapp.php?phone=${phoneNumberOnlyDigits}&text=${encodedMessage}&apikey=${apiKey}`;
 
   try {
-    await fetch(url, { method: 'GET', mode: 'no-cors' });
-    console.log(`Tentativa de envio de mensagem do WhatsApp para ${phoneNumber} efetuada.`);
+    // Requisição padrão (sem 'no-cors') para poder ler a resposta
+    const response = await fetch(url);
+
+    if (response.ok) {
+      console.log(`Mensagem do WhatsApp para ${phoneNumber} enviada com sucesso.`);
+      const responseText = await response.text();
+      console.log('Resposta do CallMeBot:', responseText); // Ex: "Message queued"
+    } else {
+      // Se a resposta não for OK, captura a mensagem de erro da API
+      const errorText = await response.text();
+      console.error(`Falha ao enviar mensagem via CallMeBot para ${phoneNumber}. Status: ${response.status}. Resposta: ${errorText}`);
+      throw new Error(`Erro do CallMeBot: ${errorText || response.statusText}`);
+    }
   } catch (error) {
-    console.error("Erro de rede ao tentar enviar mensagem via CallMeBot:", error);
-    throw new Error(`Erro de rede ao enviar notificação para ${phoneNumber}.`);
+    // Captura erros de rede ou de CORS
+    console.error("Erro de rede ou CORS ao tentar enviar mensagem via CallMeBot:", error);
+    if (error instanceof TypeError) { // Frequentemente indica um problema de CORS
+        throw new Error(`Não foi possível conectar ao CallMeBot. Verifique a conexão e o console do navegador para erros de CORS.`);
+    }
+    throw error; // Re-lança o erro (que já pode ser o erro customizado do `else` acima)
   }
 };
+
 
 const App: React.FC = () => {
   const [editableProduct, setEditableProduct] = useState<ProductDetails>({
@@ -51,6 +69,7 @@ const App: React.FC = () => {
 
   const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
+    id: 1,
     admin_whatsapp: '',
     admin_whatsapp_2: '',
     orientation_video_url: '',
@@ -217,17 +236,31 @@ ${saboresList}
     if (!call_me_bot_api_key) return { success: false, error: "API Key do CallMeBot não configurada." };
     if (!admin_whatsapp && !admin_whatsapp_2) return { success: false, error: "Nenhum WhatsApp do administrador configurado." };
 
-    try {
-        const promises = [];
-        if (admin_whatsapp) promises.push(sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp, call_me_bot_api_key));
-        if (admin_whatsapp_2) promises.push(sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp_2, call_me_bot_api_key));
-        
-        await Promise.all(promises);
-        return { success: true };
-    } catch (error) {
-        const msg = (error instanceof Error) ? error.message : 'Ocorreu um erro desconhecido.';
-        return { success: false, error: msg };
+    const results = [];
+    if (admin_whatsapp) {
+      try {
+        await sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp, call_me_bot_api_key);
+        results.push({ phone: admin_whatsapp, success: true });
+      } catch (e) {
+        results.push({ phone: admin_whatsapp, success: false, error: (e as Error).message });
+      }
     }
+    if (admin_whatsapp_2) {
+      try {
+        await sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp_2, call_me_bot_api_key);
+        results.push({ phone: admin_whatsapp_2, success: true });
+      } catch (e) {
+        results.push({ phone: admin_whatsapp_2, success: false, error: (e as Error).message });
+      }
+    }
+
+    const failed = results.filter(r => !r.success);
+    if (failed.length > 0) {
+      const errorDetails = failed.map(f => `Falha para ${f.phone}: ${f.error}`).join('; ');
+      return { success: false, error: errorDetails };
+    }
+
+    return { success: true };
   };
 
   if (isAdminView) {

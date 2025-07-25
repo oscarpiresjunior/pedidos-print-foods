@@ -23,7 +23,7 @@ export interface ProductDetails {
 }
 
 export interface AdminSettings {
-  id?: number; // Primary key for Supabase
+  id: number; // Primary key for Supabase, made required.
   admin_whatsapp: string;
   admin_whatsapp_2: string;
   orientation_video_url: string;
@@ -53,7 +53,7 @@ export interface Database {
         Update: Partial<ProductDetails>;
       };
       settings: {
-        Row: AdminSettings & { id: number }; // Row from DB will have ID
+        Row: AdminSettings;
         Insert: AdminSettings;
         Update: Partial<AdminSettings>;
       };
