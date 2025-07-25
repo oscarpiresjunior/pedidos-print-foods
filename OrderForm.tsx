@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FormData, ProductDetails, OrderTotals, AdminSettings } from './types';
+import { 
+    PLACEHOLDER_RECT_22_10, 
+    PLACEHOLDER_RECT_30_14, 
+    PLACEHOLDER_SQUARE_20_20, 
+    PLACEHOLDER_OVAL_17_25 
+} from './placeholders';
 
 interface OrderFormProps {
   formData: FormData;
@@ -20,10 +26,10 @@ const brazilianStates = [
 const quantityOptions = Array.from({ length: (2000 - 500) / 100 + 1 }, (_, i) => 500 + i * 100);
 
 const models = [
-  { id: 'Retangular 22x10mm', labelLine1: 'Retangular', labelLine2: '22x10mm', imageKey: 'modelImageRect22x10Base64' as keyof AdminSettings },
-  { id: 'Retangular 30x14mm', labelLine1: 'Retangular', labelLine2: '30x14mm', imageKey: 'modelImageRect30x14Base64' as keyof AdminSettings },
-  { id: 'Quadrada 20x20mm', labelLine1: 'Quadrada', labelLine2: '20x20mm', imageKey: 'modelImageQuadrada20x20Base64' as keyof AdminSettings },
-  { id: 'Oval 17x25mm', labelLine1: 'Oval', labelLine2: '17x25mm', imageKey: 'modelImageOval17x25Base64' as keyof AdminSettings }
+  { id: 'Retangular 22x10mm', labelLine1: 'Retangular', labelLine2: '22x10mm', imageKey: 'modelImageRect22x10Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_22_10 },
+  { id: 'Retangular 30x14mm', labelLine1: 'Retangular', labelLine2: '30x14mm', imageKey: 'modelImageRect30x14Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_RECT_30_14 },
+  { id: 'Quadrada 20x20mm', labelLine1: 'Quadrada', labelLine2: '20x20mm', imageKey: 'modelImageQuadrada20x20Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_SQUARE_20_20 },
+  { id: 'Oval 17x25mm', labelLine1: 'Oval', labelLine2: '17x25mm', imageKey: 'modelImageOval17x25Base64' as keyof AdminSettings, placeholder: PLACEHOLDER_OVAL_17_25 }
 ];
 
 
@@ -32,7 +38,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
   handleSubmit, submissionStatus, adminSettings
 }) => {
   const [cepError, setCepError] = useState<string | null>(null);
-  const [hoveredModelImage, setHoveredModelImage] = useState<string | null>(null);
 
   useEffect(() => {
     // Initialize flavor details when the component mounts if it's empty
@@ -127,6 +132,11 @@ const OrderForm: React.FC<OrderFormProps> = ({
   
   const totalAllocated = formData.flavorDetails.reduce((sum, f) => sum + f.quantity, 0);
 
+  const getImageSrc = (model: (typeof models)[0]) => {
+    return (adminSettings[model.imageKey] as string) || model.placeholder;
+  };
+
+  const selectedModel = useMemo(() => models.find(m => m.id === formData.model), [formData.model]);
 
   return (
     <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-4xl font-sans">
@@ -157,11 +167,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
                     <div 
                       key={model.id}
                       onClick={() => handleModelClick(model.id)}
-                      onMouseEnter={() => setHoveredModelImage(adminSettings[model.imageKey] || null)}
-                      onMouseLeave={() => setHoveredModelImage(null)}
                       className={`cursor-pointer border-2 rounded-lg p-3 text-center transition-all duration-300 ${formData.model === model.id ? 'border-blue-500 bg-blue-50 shadow-lg scale-105' : 'border-gray-200 hover:border-blue-400 hover:shadow-md'}`}
                     >
-                        {adminSettings[model.imageKey] && <img src={adminSettings[model.imageKey] as string} alt={`${model.labelLine1} ${model.labelLine2}`} className="w-24 h-16 mx-auto mb-3 object-contain"/>}
+                        <img src={getImageSrc(model)} alt={`${model.labelLine1} ${model.labelLine2}`} className="w-24 h-16 mx-auto mb-3 object-contain"/>
                         <div>
                             <span className="font-semibold text-gray-700 block text-sm">{model.labelLine1}</span>
                             <span className="text-xs text-gray-500">{model.labelLine2}</span>
@@ -169,9 +177,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
                     </div>
                 ))}
             </div>
-            {hoveredModelImage && (
+            {selectedModel && (
               <div className="mt-6 flex justify-center transition-opacity duration-300" style={{ minHeight: '200px' }}>
-                  <img src={hoveredModelImage} alt="Preview do modelo" className="max-w-xs w-full h-auto object-contain rounded-lg shadow-xl"/>
+                  <img src={getImageSrc(selectedModel)} alt="Preview do modelo" className="max-w-xs w-full h-auto object-contain rounded-lg shadow-xl"/>
               </div>
             )}
             {!formData.model && submissionStatus !== 'idle' && <p className="text-red-500 text-sm mt-2">Por favor, selecione um modelo.</p>}
