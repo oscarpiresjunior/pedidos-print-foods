@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AdminSettings, FormData, ProductDetails } from './types';
+import { AdminSettings, FormData, ProductDetails, Database } from './types';
 import OrderForm from './OrderForm';
 import SuccessPage from './SuccessPage';
 import AdminPanel from './AdminPanel';
@@ -49,26 +49,26 @@ const App: React.FC = () => {
   const [adminCredentials, setAdminCredentials] = useState({ username: '', password: '' });
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null);
 
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null);
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({
-    adminWhatsapp: '',
-    adminWhatsapp2: '',
-    orientationVideoUrl: '',
-    callMeBotApiKey: '',
-    pixKey: '',
+    admin_whatsapp: '',
+    admin_whatsapp_2: '',
+    orientation_video_url: '',
+    call_me_bot_api_key: '',
+    pix_key: '',
     cnpj: '',
-    logoUrl: '',
-    pixQrUrl: '',
-    modelImageUrlRect22x10: '',
-    modelImageUrlRect30x14: '',
-    modelImageUrlQuadrada20x20: '',
-    modelImageUrlOval17x25: '',
+    logo_url: '',
+    pix_qr_url: '',
+    model_image_url_rect_22x10: '',
+    model_image_url_rect_30x14: '',
+    model_image_url_quadrada_20x20: '',
+    model_image_url_oval_17x25: '',
   });
 
   useEffect(() => {
     // Inicializa o cliente Supabase com credenciais do arquivo de configuração
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-      const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
       setSupabase(client);
     } else {
       console.warn("Supabase URL e Chave Anon não estão configuradas no arquivo config.ts. A sincronização de dados estará desativada.");
@@ -93,7 +93,7 @@ const App: React.FC = () => {
         console.error("Erro ao carregar configurações do Supabase:", settingsError.message);
       } else if (settingsData) {
         console.log("Configurações carregadas do Supabase.");
-        setAdminSettings(settingsData as AdminSettings);
+        setAdminSettings(settingsData);
       }
 
       // Carrega produto
@@ -130,7 +130,7 @@ const App: React.FC = () => {
 
   const sendNotifications = useCallback(async () => {
     const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
-    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2, pixKey, cnpj } = adminSettings;
+    const { call_me_bot_api_key, admin_whatsapp, admin_whatsapp_2, pix_key, cnpj } = adminSettings;
     const { name: productName } = editableProduct;
 
     const saboresList = flavorDetails.map(f => `  - ${f.quantity}x de ${f.name || 'Sabor não definido'}`).join('\n');
@@ -146,27 +146,34 @@ ${saboresList}
 *Total:* R$ ${grandTotal.toFixed(2)}
 *Endereço:* ${fullAddress}`;
 
-    if (!callMeBotApiKey || (!adminWhatsapp && !adminWhatsapp2)) {
+    if (!call_me_bot_api_key || (!admin_whatsapp && !admin_whatsapp_2)) {
       console.error("Notificação por WhatsApp não configurada.");
       return;
     }
     
-    const adminPromises: Promise<void>[] = [];
-    if (adminWhatsapp) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp, callMeBotApiKey));
-    if (adminWhatsapp2) adminPromises.push(sendWhatsAppViaCallMeBot(adminMessage, adminWhatsapp2, callMeBotApiKey));
-    
-    // Using Promise.allSettled is a modern and safer way to handle multiple promises
-    // when you want to wait for all of them to complete, regardless of whether they
-    // succeed or fail. This avoids the type complexity of the .map/.catch pattern that
-    // was causing the "type instantiation is excessively deep" error.
-    await Promise.allSettled(adminPromises);
+    // Send notifications sequentially to avoid potential complex promise-related type errors.
+    // The performance difference for two notifications is negligible.
+    if (admin_whatsapp) {
+      try {
+        await sendWhatsAppViaCallMeBot(adminMessage, admin_whatsapp, call_me_bot_api_key);
+      } catch(e) {
+        console.error("Failed to send notification to admin 1:", e);
+      }
+    }
+    if (admin_whatsapp_2) {
+      try {
+        await sendWhatsAppViaCallMeBot(adminMessage, admin_whatsapp_2, call_me_bot_api_key);
+      } catch(e) {
+        console.error("Failed to send notification to admin 2:", e);
+      }
+    }
     console.log("Tentativas de notificação para administradores concluídas.");
 
     try {
-      if(whatsapp && callMeBotApiKey){
-          const pixInfo = pixKey || cnpj || "Chave PIX não configurada";
+      if(whatsapp && call_me_bot_api_key){
+          const pixInfo = pix_key || cnpj || "Chave PIX não configurada";
           const clientMessage = `Olá, ${nome}! Seu pedido na Print Foods foi recebido com sucesso! 🎉\n\n*Resumo do seu pedido:*\n- *Produto:* ${productName}\n- *Quantidade:* ${quantity} unidades\n- *Valor Total:* R$ ${grandTotal.toFixed(2)}\n\nPara agilizar, você pode efetuar o pagamento via PIX e nos enviar o comprovante.\n\n*Nossa chave PIX:* ${pixInfo}\n\nEm breve nossa equipe entrará em contato. Obrigado!`;
-          await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, callMeBotApiKey);
+          await sendWhatsAppViaCallMeBot(clientMessage, whatsapp, call_me_bot_api_key);
       }
     } catch (clientError) {
       console.error("Falha ao enviar confirmação para o cliente:", clientError);
@@ -204,16 +211,16 @@ ${saboresList}
   };
 
   const handleTestWhatsapp = async (): Promise<{ success: boolean; error?: string }> => {
-    const { callMeBotApiKey, adminWhatsapp, adminWhatsapp2 } = adminSettings;
+    const { call_me_bot_api_key, admin_whatsapp, admin_whatsapp_2 } = adminSettings;
     const testMessage = "Esta é uma mensagem de teste do sistema de pedidos da Print Foods.";
     
-    if (!callMeBotApiKey) return { success: false, error: "API Key do CallMeBot não configurada." };
-    if (!adminWhatsapp && !adminWhatsapp2) return { success: false, error: "Nenhum WhatsApp do administrador configurado." };
+    if (!call_me_bot_api_key) return { success: false, error: "API Key do CallMeBot não configurada." };
+    if (!admin_whatsapp && !admin_whatsapp_2) return { success: false, error: "Nenhum WhatsApp do administrador configurado." };
 
     try {
         const promises = [];
-        if (adminWhatsapp) promises.push(sendWhatsAppViaCallMeBot(testMessage, adminWhatsapp, callMeBotApiKey));
-        if (adminWhatsapp2) promises.push(sendWhatsAppViaCallMeBot(testMessage, adminWhatsapp2, callMeBotApiKey));
+        if (admin_whatsapp) promises.push(sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp, call_me_bot_api_key));
+        if (admin_whatsapp_2) promises.push(sendWhatsAppViaCallMeBot(testMessage, admin_whatsapp_2, call_me_bot_api_key));
         
         await Promise.all(promises);
         return { success: true };

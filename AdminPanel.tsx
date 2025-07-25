@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { AdminSettings, ProductDetails } from './types';
+import { AdminSettings, ProductDetails, Database } from './types';
 
 interface AdminPanelProps {
     adminSettings: AdminSettings;
@@ -10,14 +10,14 @@ interface AdminPanelProps {
     setEditableProduct: React.Dispatch<React.SetStateAction<ProductDetails>>;
     onTestWhatsapp: () => Promise<{ success: boolean; error?: string }>;
     onExitAdmin: () => void;
-    supabase: SupabaseClient | null;
+    supabase: SupabaseClient<Database> | null;
 }
 
 const modelsToManage = [
-  { key: 'modelImageUrlRect22x10', label: 'Retangular 22x10mm' },
-  { key: 'modelImageUrlRect30x14', label: 'Retangular 30x14mm' },
-  { key: 'modelImageUrlQuadrada20x20', label: 'Quadrada 20x20mm' },
-  { key: 'modelImageUrlOval17x25', label: 'Oval 17x25mm' }
+  { key: 'model_image_url_rect_22x10', label: 'Retangular 22x10mm' },
+  { key: 'model_image_url_rect_30x14', label: 'Retangular 30x14mm' },
+  { key: 'model_image_url_quadrada_20x20', label: 'Quadrada 20x20mm' },
+  { key: 'model_image_url_oval_17x25', label: 'Oval 17x25mm' }
 ];
 
 const MEDIA_BUCKET = 'media';
@@ -103,8 +103,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             return { success: false };
         } else {
             if(settingsData) {
-                setAdminSettings(settingsData as AdminSettings);
-                setInitialSettings(settingsData as AdminSettings);
+                setAdminSettings(settingsData);
+                setInitialSettings(settingsData);
             }
             if(productData) {
                 const typedProductData = productData as ProductDetails;
@@ -181,16 +181,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Gerenciamento de Mídia Principal</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
                             <div>
-                                <label htmlFor="logoUrl" className="block text-sm font-medium text-gray-700">Logo da Empresa</label>
-                                <input type="file" id="logoUrl" accept="image/*" onChange={(e) => handleFileChange(e, 'logoUrl')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
-                                {adminSettings.logoUrl && <img src={adminSettings.logoUrl} alt="Logo Preview" className="mt-2 h-16 w-auto border rounded p-1"/>}
-                                {isUploading === 'logoUrl' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
+                                <label htmlFor="logo_url" className="block text-sm font-medium text-gray-700">Logo da Empresa</label>
+                                <input type="file" id="logo_url" accept="image/*" onChange={(e) => handleFileChange(e, 'logo_url')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
+                                {adminSettings.logo_url && <img src={adminSettings.logo_url} alt="Logo Preview" className="mt-2 h-16 w-auto border rounded p-1"/>}
+                                {isUploading === 'logo_url' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
                             </div>
                             <div>
-                                <label htmlFor="pixQrUrl" className="block text-sm font-medium text-gray-700">QR Code do PIX</label>
-                                <input type="file" id="pixQrUrl" accept="image/*" onChange={(e) => handleFileChange(e, 'pixQrUrl')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
-                                {adminSettings.pixQrUrl && <img src={adminSettings.pixQrUrl} alt="PIX QR Code Preview" className="mt-2 h-16 w-16 border rounded p-1"/>}
-                                {isUploading === 'pixQrUrl' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
+                                <label htmlFor="pix_qr_url" className="block text-sm font-medium text-gray-700">QR Code do PIX</label>
+                                <input type="file" id="pix_qr_url" accept="image/*" onChange={(e) => handleFileChange(e, 'pix_qr_url')} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" disabled={isUploading !== null || !supabase}/>
+                                {adminSettings.pix_qr_url && <img src={adminSettings.pix_qr_url} alt="PIX QR Code Preview" className="mt-2 h-16 w-16 border rounded p-1"/>}
+                                {isUploading === 'pix_qr_url' && <p className="text-sm text-blue-600 mt-2">Enviando...</p>}
                             </div>
                         </div>
                     </div>
@@ -215,9 +215,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         <h3 className="text-xl font-semibold text-blue-700 mb-6 border-b pb-3">Informações da Loja e Pagamento</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
                             <input type="text" name="cnpj" placeholder="CNPJ da Empresa" value={adminSettings.cnpj} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
-                            <input type="text" name="pixKey" placeholder="Chave PIX" value={adminSettings.pixKey} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
+                            <input type="text" name="pix_key" placeholder="Chave PIX" value={adminSettings.pix_key} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             <div className="md:col-span-2">
-                                <input type="url" name="orientationVideoUrl" placeholder="URL do Vídeo de Orientação" value={adminSettings.orientationVideoUrl} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
+                                <input type="url" name="orientation_video_url" placeholder="URL do Vídeo de Orientação" value={adminSettings.orientation_video_url} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             </div>
                         </div>
                     </div>
@@ -237,16 +237,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 mb-8">
                             <div>
-                                <label htmlFor="adminWhatsapp" className="block text-sm font-medium text-gray-700">WhatsApp do Admin 1</label>
-                                <input id="adminWhatsapp" type="tel" name="adminWhatsapp" placeholder="Nº com código do país (Ex: 55119...)" value={adminSettings.adminWhatsapp} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
+                                <label htmlFor="admin_whatsapp" className="block text-sm font-medium text-gray-700">WhatsApp do Admin 1</label>
+                                <input id="admin_whatsapp" type="tel" name="admin_whatsapp" placeholder="Nº com código do país (Ex: 55119...)" value={adminSettings.admin_whatsapp} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             </div>
                              <div>
-                                <label htmlFor="adminWhatsapp2" className="block text-sm font-medium text-gray-700">WhatsApp do Admin 2 (Opcional)</label>
-                                <input id="adminWhatsapp2" type="tel" name="adminWhatsapp2" placeholder="Nº com código do país (Ex: 55219...)" value={adminSettings.adminWhatsapp2} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
+                                <label htmlFor="admin_whatsapp_2" className="block text-sm font-medium text-gray-700">WhatsApp do Admin 2 (Opcional)</label>
+                                <input id="admin_whatsapp_2" type="tel" name="admin_whatsapp_2" placeholder="Nº com código do país (Ex: 55219...)" value={adminSettings.admin_whatsapp_2} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md" />
                             </div>
                             <div className="md:col-span-2">
-                                <label htmlFor="callMeBotApiKey" className="block text-sm font-medium text-gray-700">API Key do CallMeBot</label>
-                                <input id="callMeBotApiKey" type="text" name="callMeBotApiKey" placeholder="Sua API Key do CallMeBot" value={adminSettings.callMeBotApiKey} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md"/>
+                                <label htmlFor="call_me_bot_api_key" className="block text-sm font-medium text-gray-700">API Key do CallMeBot</label>
+                                <input id="call_me_bot_api_key" type="text" name="call_me_bot_api_key" placeholder="Sua API Key do CallMeBot" value={adminSettings.call_me_bot_api_key} onChange={handleSettingsChange} className="mt-1 block w-full p-2 border rounded-md"/>
                             </div>
                         </div>
                         
