@@ -155,7 +155,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         
         {/* Section 1: Model */}
         <section>
-            <h3 className="text-xl font-bold text-gray-800 mb-6 border-b-2 pb-3">1. Escolha o Modelo</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-6 border-b-2 pb-3">1. Escolha o Modelo da Etiqueta:</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {models.map(model => (
                 <div key={model.id} onClick={() => handleModelClick(model.id)} className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${formData.model === model.id ? 'border-blue-500 bg-blue-50 shadow-lg' : 'border-gray-300 hover:border-blue-400 hover:shadow-md'}`}>
@@ -166,6 +166,17 @@ const OrderForm: React.FC<OrderFormProps> = ({
               ))}
             </div>
             {!formData.model && submissionStatus === 'idle' && <p className="text-red-500 text-sm mt-2">Por favor, selecione um modelo.</p>}
+            
+            {selectedModel && (
+              <div className="mt-8 flex justify-center">
+                  <img
+                      key={getImageSrc(selectedModel)} // key ensures re-render and re-animation on src change
+                      src={getImageSrc(selectedModel)}
+                      alt={`Preview do modelo ${selectedModel.id}`}
+                      className="rounded-lg shadow-lg max-w-full sm:max-w-md w-full object-contain animate-fade-in"
+                  />
+              </div>
+            )}
         </section>
 
         {/* Section 2: Quantity and Flavors */}
