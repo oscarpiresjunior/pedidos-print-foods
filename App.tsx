@@ -46,13 +46,14 @@ const sendWhatsAppViaCallMeBot = async (message: string, phoneNumber: string, ap
 const App: React.FC = () => {
   const [editableProduct, setEditableProduct] = useState<ProductDetails>({
     id: 'etiquetas_comestiveis',
-    name: 'Etiquetas Comestíveis Personalizadas',
-    description: '',
+    name: 'Etiquetas Comestíveis',
+    description: 'Etiquetas personalizadas com o sabor à sua escolha para aplicar nos seus crepes. Desconto exclusivo de 20% para alunas do curso Minha Fábrica de Crepes.',
     price: 0,
   });
   
   const [formData, setFormData] = useState<FormData>({
     nome: '', whatsapp: '', email: '',
+    cpf_cnpj: '',
     cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
     model: '',
     quantity: 500,
@@ -147,8 +148,8 @@ const App: React.FC = () => {
     setIsSubmitted(true);
   };
 
-  const sendNotifications = useCallback(async () => {
-    const { quantity, flavorDetails, nome, whatsapp, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
+  const sendNotifications = useCallback(async (): Promise<void> => {
+    const { quantity, flavorDetails, nome, whatsapp, cpf_cnpj, cep, logradouro, numero, bairro, cidade, estado, model } = formData;
     const { call_me_bot_api_key, admin_whatsapp, admin_whatsapp_2, pix_key, cnpj } = adminSettings;
     const { name: productName } = editableProduct;
 
@@ -158,7 +159,7 @@ const App: React.FC = () => {
     const adminMessage = `*Novo Pedido Print Foods*
 *Cliente:* ${nome}
 *Contato:* ${whatsapp}
-*Modelo:* ${model}
+${cpf_cnpj ? `*CPF/CNPJ:* ${cpf_cnpj}\n` : ''}*Modelo:* ${model}
 *Pedido:* ${quantity}x ${productName}
 *Sabores:*
 ${saboresList}
@@ -197,7 +198,7 @@ ${saboresList}
     } catch (clientError) {
       console.error("Falha ao enviar confirmação para o cliente:", clientError);
     }
-  }, [formData, adminSettings, grandTotal, editableProduct]);
+  }, [formData, adminSettings, grandTotal, editableProduct.name]);
 
   useEffect(() => {
     if (isSubmitted) {
@@ -208,6 +209,7 @@ ${saboresList}
   const handleNewRegistration = () => {
     setFormData({
         nome: '', whatsapp: '', email: '',
+        cpf_cnpj: '',
         cep: '', logradouro: '', numero: '', bairro: '', cidade: '', estado: '',
         model: '',
         quantity: 500, 

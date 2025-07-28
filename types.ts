@@ -4,6 +4,7 @@ export interface FormData {
   nome: string;
   whatsapp: string;
   email:string;
+  cpf_cnpj?: string;
   cep: string;
   logradouro: string;
   numero: string;
