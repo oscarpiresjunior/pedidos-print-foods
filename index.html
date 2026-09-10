@@ -27,7 +27,15 @@
       }
     </style>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖨️</text></svg>">
-  <script type="importmap">
+  
+    <script>
+  // Redireciona automaticamente para o domínio principal
+  if (window.location.hostname.includes('netlify.app')) {
+    window.location.replace('https://printfoods.com.br' + window.location.pathname + window.location.search);
+  }
+</script>
+    
+    <script type="importmap">
 {
   "imports": {
     "react/": "https://esm.sh/react@^19.1.0/",
@@ -46,3 +54,4 @@
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
+*/
